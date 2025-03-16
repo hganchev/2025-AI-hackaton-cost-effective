@@ -1,3 +1,5 @@
+import { ReactNode } from "react";
+
 // Типове за книги
 export interface Book {
   id: string;
@@ -65,6 +67,7 @@ export type SortDirection = 'asc' | 'desc';
 export interface NavItem {
   name: string;
   href: string;
+  icon?: ReactNode;
 }
 
 export interface Category {
