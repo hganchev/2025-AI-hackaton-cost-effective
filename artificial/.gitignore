@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+
+media/
+ml_models/
+
+.venv/
+staticfiles/
