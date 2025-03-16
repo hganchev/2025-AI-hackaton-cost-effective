@@ -27,10 +27,10 @@ AccountModel: BaseAccount = get_user_model()
 )
 def sign_up(request: HttpRequest, data: SignupRequest) -> Union[Dict[str, Any], tuple[int, Dict[str, Any]]]:
     if data.password != data.re_password:
-        return Status.HTTP_400_BAD_REQUEST, {'error': AuthErrors.PASSWORDS_DO_NOT_MATCH}
+        return Status.HTTP_400_BAD_REQUEST, {'error': AuthErrors.PASSWORDS_DO_NOT_MATCH.value}
 
     if AccountModel.objects.filter(email=data.email).exists():
-        return Status.HTTP_400_BAD_REQUEST, {'error': AuthErrors.EMAIL_ALREADY_EXISTS}
+        return Status.HTTP_400_BAD_REQUEST, {'error': AuthErrors.EMAIL_ALREADY_EXISTS.value}
 
     with transaction.atomic():
         AccountModel.objects.create_user(email=data.email, password=data.password)

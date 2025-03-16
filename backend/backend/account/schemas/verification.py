@@ -1,13 +1,9 @@
-from datetime import datetime
-from typing import Optional
-
 from ninja import Schema
 
 
 class VerificationRequest(Schema):
     """Schema for account verification requests."""
-    email: str
-    verification_code: str
+    code: str
 
 
 class VerificationResponse(Schema):
@@ -25,5 +21,3 @@ class ResendVerificationResponse(Schema):
     """Schema for successful resend verification responses."""
     success: bool = True
     message: str = "Verification code has been resent"
-    verification_code: Optional[str] = None
-    expiration_time: Optional[datetime] = None
