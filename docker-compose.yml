@@ -42,29 +42,29 @@ services:
     networks:
       - app-network
 
-  # Artificial service (ML application)
-  artificial:
-    build: ./artificial
-    command: python manage.py runserver 0.0.0.0:8001
-    volumes:
-      - ./artificial:/app
-      - ml_models_data:/app/ml_models
-      - media_data:/app/media
-    ports:
-      - "8001:8001"
-    environment:
-      - DEBUG=1
-      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
-    networks:
-      - app-network
-    restart: unless-stopped
+  # # Artificial service (ML application)
+  # artificial:
+  #   build: ./artificial
+  #   command: python manage.py runserver 0.0.0.0:8001
+  #   volumes:
+  #     - ./artificial:/app
+  #     - ml_models_data:/app/ml_models
+  #     - media_data:/app/media
+  #   ports:
+  #     - "8001:8001"
+  #   environment:
+  #     - DEBUG=1
+  #     - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
 
 volumes:
   redis_data:
-  ml_models_data:
-    # Persists the downloaded ML models between container restarts
-  media_data:
-    # Persists uploaded books and translations
+  # ml_models_data:
+  #   # Persists the downloaded ML models between container restarts
+  # media_data:
+  #   # Persists uploaded books and translations
 
 networks:
   app-network:
