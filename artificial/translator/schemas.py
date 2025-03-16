@@ -64,6 +64,17 @@ class TranslationOut(BaseModel):
 
 class TranslationCreate(BaseModel):
     book_id: int
+    max_length: Optional[int] = 400  # Maximum length of tokens for translation
+    
+class TranslationPaginatedCreate(TranslationCreate):
+    page: int = 1  # Start with page 1
+    page_size: int = 2000  # Characters per page
+
+class TranslationPaginatedOut(TranslationOut):
+    total_pages: int
+    current_page: int
+    has_next: bool
+    has_previous: bool
 
 class TranslationList(BaseModel):
     translations: List[TranslationOut]

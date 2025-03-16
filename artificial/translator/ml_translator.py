@@ -85,7 +85,7 @@ def get_translator(source_lang, target_lang):
         logger.error(f"Failed to load multilingual model: {str(e)}")
         raise
 
-def translate_text(text, source_lang, target_lang, chunk_size=512):
+def translate_text(text, source_lang, target_lang, max_length=400, chunk_size=None):
     """
     Translate text from source language to target language.
     
@@ -93,7 +93,9 @@ def translate_text(text, source_lang, target_lang, chunk_size=512):
         text (str): Text to translate
         source_lang (str): Source language code
         target_lang (str): Target language code
+        max_length (int): Maximum token length for translation output
         chunk_size (int): Max chunk size for translation to avoid memory issues
+                         If None, will be calculated based on max_length
         
     Returns:
         str: Translated text
@@ -104,6 +106,11 @@ def translate_text(text, source_lang, target_lang, chunk_size=512):
         
         # Get the appropriate model and tokenizer
         model, tokenizer, model_type = get_translator(source_lang, target_lang)
+        
+        # Calculate chunk size based on max_length if not provided
+        if chunk_size is None:
+            # Use 90% of max_length as a safe margin
+            chunk_size = int(max_length * 0.9)
         
         # Split text into manageable chunks to avoid memory issues
         chunks = split_text_into_chunks(text, chunk_size)
@@ -118,14 +125,14 @@ def translate_text(text, source_lang, target_lang, chunk_size=512):
                 translated_tokens = model.generate(
                     **inputs,
                     forced_bos_token_id=tokenizer.get_lang_id(target_lang),
-                    max_length=int(len(chunk.split()) * 1.5) + 10,  # Reasonable length limit
+                    max_length=max_length,  # Use provided max_length
                 )
                 translated_chunk = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
             
             else:  # opus-mt or other models
                 # Create a translation pipeline
                 translator = pipeline('translation', model=model, tokenizer=tokenizer)
-                result = translator(chunk, max_length=int(len(chunk.split()) * 1.5) + 10)
+                result = translator(chunk, max_length=max_length)
                 translated_chunk = result[0]['translation_text']
             
             translated_chunks.append(translated_chunk)
@@ -137,6 +144,75 @@ def translate_text(text, source_lang, target_lang, chunk_size=512):
         logger.error(f"Translation error: {str(e)}")
         # Return original text with error message if translation fails
         return f"[Translation Error: {str(e)}]\n\n{text}"
+
+def translate_text_paginated(text, source_lang, target_lang, page=1, page_size=2000, max_length=400):
+    """
+    Translate a specific page of text.
+    
+    Args:
+        text (str): Full text to translate
+        source_lang (str): Source language code
+        target_lang (str): Target language code
+        page (int): Page number to translate (1-indexed)
+        page_size (int): Number of characters per page
+        max_length (int): Maximum token length for translation
+        
+    Returns:
+        dict: Contains translated text and pagination information
+    """
+    try:
+        if not text or len(text.strip()) == 0:
+            return {
+                "translated_text": "",
+                "total_pages": 0,
+                "current_page": page,
+                "has_next": False,
+                "has_previous": False
+            }
+        
+        # Calculate total pages
+        total_chars = len(text)
+        total_pages = (total_chars + page_size - 1) // page_size
+        
+        # Ensure page is within bounds
+        page = max(1, min(page, total_pages))
+        
+        # Extract the text segment for the current page
+        start_idx = (page - 1) * page_size
+        end_idx = min(start_idx + page_size, total_chars)
+        page_text = text[start_idx:end_idx]
+        
+        # Ensure we're not cutting in the middle of words/sentences if possible
+        # If not at the start of the text, try to find a sentence boundary
+        if start_idx > 0:
+            # Find first period, question mark, or exclamation point followed by a space
+            sentence_end_markers = ['. ', '? ', '! ', '.\n', '?\n', '!\n']
+            for marker in sentence_end_markers:
+                marker_pos = page_text.find(marker)
+                if marker_pos > 0:
+                    page_text = page_text[marker_pos + len(marker):]
+                    break
+        
+        # Translate the page text
+        translated_page = translate_text(page_text, source_lang, target_lang, max_length)
+        
+        return {
+            "translated_text": translated_page,
+            "total_pages": total_pages,
+            "current_page": page,
+            "has_next": page < total_pages,
+            "has_previous": page > 1
+        }
+        
+    except Exception as e:
+        logger.error(f"Paginated translation error: {str(e)}")
+        return {
+            "translated_text": f"[Translation Error: {str(e)}]",
+            "total_pages": 0,
+            "current_page": page,
+            "has_next": False,
+            "has_previous": False
+        }
 
 def split_text_into_chunks(text, chunk_size=512):
     """
