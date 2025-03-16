@@ -7,8 +7,10 @@ services:
     volumes:
       - .:/app
       # Create persistent volumes for media and model cache
-      - ml_models_data:/app/ml_models
-      - media_data:/app/media
+      # - ml_models_data:/app/ml_models
+      # - media_data:/app/media
+      - ./media:/app/media
+      - ./ml_models:/app/ml_models
     ports:
       - "8000:8000"
     environment:
@@ -16,8 +18,8 @@ services:
       - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
     restart: unless-stopped
 
-volumes:
-  ml_models_data:
-    # This volume persists the downloaded ML models between container restarts
-  media_data:
-    # This volume persists uploaded books and translations
+# volumes:
+#   ml_models_data:
+#     # This volume persists the downloaded ML models between container restarts
+#   media_data:
+#     # This volume persists uploaded books and translations
