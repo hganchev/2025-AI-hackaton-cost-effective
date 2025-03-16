@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { BookCard } from '@/components/book-card';
-import { Navbar } from '@/components/navbar';
+import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/footer';
 
 export default function Home() {

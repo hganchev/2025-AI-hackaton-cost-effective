@@ -14,6 +14,37 @@ export interface BookData extends Book {
   totalPages: number;
 }
 
+// Типове за потребители
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role: 'user' | 'admin';
+}
+
+export interface UserCredentials {
+  email: string;
+  password: string;
+}
+
+export interface UserRegistration extends UserCredentials {
+  name: string;
+  confirmPassword: string;
+}
+
+export interface Session {
+  user: User;
+  token: string;
+  expiresAt: number;
+}
+
+export interface FavoriteBook {
+  userId: string;
+  bookId: string;
+  addedAt: Date;
+}
+
 // Типове за компоненти
 export interface BookCardProps {
   book: Book;

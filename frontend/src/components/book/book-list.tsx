@@ -3,11 +3,13 @@
 import React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { BookOpen } from "lucide-react"
+import { BookOpen, Heart } from "lucide-react"
 import { Book } from "@/types/index"
 import { Button } from "@/components/ui/button"
 import { cn, truncateText, formatYear } from "@/lib/utils"
 import { EmptyState } from "./empty-state"
+import { useAuth } from "@/lib/auth-context"
+import { useFavorites } from "@/lib/favorites-context"
 
 interface BookListProps {
   books: Book[]
@@ -16,9 +18,17 @@ interface BookListProps {
 }
 
 export function BookList({ books, className, emptyStateProps }: BookListProps) {
+  const { isAuthenticated } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  
   if (!books || books.length === 0) {
     return <EmptyState {...emptyStateProps} />
   }
+
+  const handleFavoriteClick = (e: React.MouseEvent, bookId: string) => {
+    e.preventDefault();
+    toggleFavorite(bookId);
+  };
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -58,12 +68,28 @@ export function BookList({ books, className, emptyStateProps }: BookListProps) {
                 </Button>
               </Link>
               
-              <button 
-                className="text-muted-foreground hover:text-primary text-sm"
-                aria-label="Добави в моите книги"
-              >
-                Запази
-              </button>
+              {isAuthenticated ? (
+                <button 
+                  className={cn(
+                    "flex items-center text-sm gap-1 transition-colors",
+                    isFavorite(book.id) 
+                      ? "text-red-500 hover:text-red-600"
+                      : "text-muted-foreground hover:text-primary"
+                  )}
+                  onClick={(e) => handleFavoriteClick(e, book.id)}
+                  aria-label={isFavorite(book.id) ? "Премахни от любими" : "Добави в любими"}
+                >
+                  <Heart className={cn("h-4 w-4", isFavorite(book.id) && "fill-current")} />
+                  <span>{isFavorite(book.id) ? "Премахни" : "Запази"}</span>
+                </button>
+              ) : (
+                <Link 
+                  href="/login" 
+                  className="text-muted-foreground hover:text-primary text-sm"
+                >
+                  Вход за запазване
+                </Link>
+              )}
             </div>
           </div>
         </div>

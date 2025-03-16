@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Navbar } from '@/components/navbar'
+import { Navbar } from '@/components/layout/navbar'
 import { Footer } from '@/components/footer'
 import { BookCard } from '@/components/book-card'
 import { Filter, Grid, List } from 'lucide-react'

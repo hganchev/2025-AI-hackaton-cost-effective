@@ -3,10 +3,12 @@
 import React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { BookOpen } from "lucide-react"
+import { BookOpen, Heart } from "lucide-react"
 import { Book } from "@/types/index"
 import { Button } from "@/components/ui/button"
 import { cn, truncateText, formatYear } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-context"
+import { useFavorites } from "@/lib/favorites-context"
 
 export interface BookCardProps {
   book: Book;
@@ -16,8 +18,16 @@ export interface BookCardProps {
 
 export function BookCard({ book, variant = 'default', className }: BookCardProps) {
   const { id, title, author, coverImage, year, description } = book;
+  const { isAuthenticated } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
   
   const isCompact = variant === 'compact';
+  const isFavorited = isFavorite(id);
+  
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    toggleFavorite(id);
+  };
   
   return (
     <div className={cn(
@@ -61,12 +71,28 @@ export function BookCard({ book, variant = 'default', className }: BookCardProps
             </Button>
           </Link>
           
-          <button 
-            className="text-muted-foreground hover:text-primary text-sm"
-            aria-label="Добави в моите книги"
-          >
-            Запази
-          </button>
+          {isAuthenticated ? (
+            <button 
+              className={cn(
+                "flex items-center text-sm gap-1 transition-colors",
+                isFavorited 
+                  ? "text-red-500 hover:text-red-600"
+                  : "text-muted-foreground hover:text-primary"
+              )}
+              onClick={handleFavoriteClick}
+              aria-label={isFavorited ? "Премахни от любими" : "Добави в любими"}
+            >
+              <Heart className={cn("h-4 w-4", isFavorited && "fill-current")} />
+              <span>{isFavorited ? "Премахни" : "Запази"}</span>
+            </button>
+          ) : (
+            <Link 
+              href="/login" 
+              className="text-muted-foreground hover:text-primary text-sm"
+            >
+              Вход за запазване
+            </Link>
+          )}
         </div>
       </div>
     </div>
