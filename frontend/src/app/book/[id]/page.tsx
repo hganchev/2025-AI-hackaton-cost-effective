@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, BookOpen, Bookmark, Share2, Settings } from 'lucide-react'
-import { Navbar } from '@/components/navbar'
-import { Footer } from '@/components/footer'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -123,14 +121,12 @@ export default function BookReader({ params }: BookReaderProps) {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Navbar />
         <main className="flex-grow flex items-center justify-center">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-64 bg-muted rounded mb-4"></div>
             <div className="h-4 w-40 bg-muted rounded"></div>
           </div>
         </main>
-        <Footer />
       </div>
     )
   }
@@ -139,7 +135,6 @@ export default function BookReader({ params }: BookReaderProps) {
   if (!book) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Navbar />
         <main className="flex-grow flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">Book Not Found</h1>
@@ -149,7 +144,6 @@ export default function BookReader({ params }: BookReaderProps) {
             </Link>
           </div>
         </main>
-        <Footer />
       </div>
     )
   }
@@ -157,7 +151,6 @@ export default function BookReader({ params }: BookReaderProps) {
   // Main content
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
       
       <main className="flex-grow">
         {/* Book Header */}
@@ -297,7 +290,6 @@ export default function BookReader({ params }: BookReaderProps) {
         </div>
       </main>
       
-      <Footer />
     </div>
   )
 }

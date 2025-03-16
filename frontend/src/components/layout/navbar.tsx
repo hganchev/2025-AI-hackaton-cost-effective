@@ -20,7 +20,7 @@ export function Navbar() {
   // Mock implementation for authContext instead of useAuth() which causes an error
   const mockAuth = {
     user: null,
-    isAuthenticated: true
+    isAuthenticated: false
   }
   
   const [isMenuOpen, setIsMenuOpen] = useState(false)
