@@ -26,7 +26,8 @@ class AuthErrors(str, Enum):
     PASSWORDS_DO_NOT_MATCH = "Password miss match"
 
 
-class JTWSettings(str, Enum):
+class JTWSettings(Enum):
+    """JWT settings as enum constants."""
     JWT_SECRET = getattr(settings, 'JWT_SECRET', 'default_secret_key_change_in_production')
     JWT_ALGORITHM = getattr(settings, 'JWT_ALGORITHM', 'HS256')
     ACCESS_TOKEN_LIFETIME = getattr(settings, 'ACCESS_TOKEN_LIFETIME', timedelta(minutes=15))
