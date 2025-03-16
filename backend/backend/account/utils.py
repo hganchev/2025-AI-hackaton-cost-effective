@@ -25,16 +25,24 @@ class TokenUtilsMixin:
         Returns:
             A tuple containing the access token and refresh token
         """
+        access_lifetime = timedelta(minutes=15)
+        if isinstance(JTWSettings.ACCESS_TOKEN_LIFETIME.value, timedelta):
+            access_lifetime = JTWSettings.ACCESS_TOKEN_LIFETIME.value
+            
+        refresh_lifetime = timedelta(days=7)
+        if isinstance(JTWSettings.REFRESH_TOKEN_LIFETIME.value, timedelta):
+            refresh_lifetime = JTWSettings.REFRESH_TOKEN_LIFETIME.value
+
         access_token = self._create_token(
             account=account,
             token_type="access",
-            lifetime=JTWSettings.ACCESS_TOKEN_LIFETIME.value
+            lifetime=access_lifetime
         )
 
         refresh_token = self._create_token(
             account=account,
             token_type="refresh",
-            lifetime=JTWSettings.REFRESH_TOKEN_LIFETIME.value
+            lifetime=refresh_lifetime
         )
 
         return access_token, refresh_token
