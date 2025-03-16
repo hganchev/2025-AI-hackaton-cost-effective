@@ -1,4 +1,4 @@
-import { User, UserRegistration, UserCredentials } from '@/types'
+import type { User, UserRegistration, UserCredentials } from './types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
@@ -14,6 +14,7 @@ export const api = {
     try {
       const response = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
