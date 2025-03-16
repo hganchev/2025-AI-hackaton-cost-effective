@@ -265,7 +265,7 @@ export default function Home() {
                 variants={fadeInUp}
                 className="bg-white dark:bg-slate-800 rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden group"
               >
-                <Link href={`/books/${book.id}`}>
+                <Link href={`/book/${book.id}`}>
                   <div className="h-64 overflow-hidden">
                     <div className="w-full h-full relative transform group-hover:scale-105 transition-transform duration-300">
                       {book.coverImage.startsWith('/') ? (

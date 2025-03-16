@@ -86,7 +86,7 @@ export const BookCard = ({
           </p>
           
           <div className="flex items-center justify-between mt-auto">
-            <Link href={`/books/${book.id}`}>
+            <Link href={`/book/${book.id}`}>
               <Button variant="outline" size="sm" className="border-amber-500 text-amber-600 dark:border-amber-400 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-700">
                 <BookOpen className="w-4 h-4 mr-1" />
                 Read Now
@@ -115,7 +115,7 @@ export const BookCard = ({
   
   return (
     <div className={cn("bg-white dark:bg-slate-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group h-full", className)}>
-      <Link href={`/books/${book.id}`} className="block h-full">
+      <Link href={`/book/${book.id}`} className="block h-full">
         <div className="aspect-[2/3] overflow-hidden relative">
           <div className="w-full h-full relative transform group-hover:scale-105 transition-transform duration-300">
             {book.coverImage && book.coverImage.trim() !== '' ? (
