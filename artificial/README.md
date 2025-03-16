@@ -9,6 +9,7 @@ A Django application with Django Ninja API that provides ML-based book translati
 - Machine learning-based translation
 - Multiple language support
 - Admin interface for managing translations
+- Paginated translation for large books
 
 ## Setup and Installation
 
@@ -16,8 +17,11 @@ A Django application with Django Ninja API that provides ML-based book translati
 
 - Python 3.8 or higher
 - pip (Python package manager)
+- Docker (optional, for containerized deployment)
 
 ### Installation
+
+#### Option 1: Local Development
 
 1. Clone the repository:
    ```
@@ -33,7 +37,7 @@ A Django application with Django Ninja API that provides ML-based book translati
 
 3. Install the required packages:
    ```
-   pip install django djangorestframework django-ninja pydantic
+   pip install -r requirements.txt
    ```
 
 4. Run migrations to create the database:
@@ -51,10 +55,33 @@ A Django application with Django Ninja API that provides ML-based book translati
    python manage.py runserver
    ```
 
-7. Access the application at:
-   - API documentation: http://localhost:8000/api/docs
-   - Admin panel: http://localhost:8000/admin
-   - Homepage: http://localhost:8000/
+#### Option 2: Docker Deployment
+
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   ```
+
+2. Build the Docker image:
+   ```
+   docker build -t book-translator-api .
+   ```
+
+3. Run the Docker container:
+   ```
+   docker run -p 8000:8000 -v $(pwd)/media:/app/media book-translator-api
+   ```
+
+4. If needed, you can create a superuser inside the container:
+   ```
+   docker exec -it <container_id> python manage.py createsuperuser
+   ```
+
+### Accessing the Application
+
+- API documentation: http://localhost:8000/api/docs
+- Admin panel: http://localhost:8000/admin
+- Homepage: http://localhost:8000/
 
 ## Usage
 
@@ -67,6 +94,8 @@ A Django application with Django Ninja API that provides ML-based book translati
 - **GET /api/translations**: List all translations
 - **GET /api/translations/{id}**: Get translation details
 - **POST /api/translations**: Create a new translation job
+- **POST /api/translations/paginated**: Create a paginated translation job
+- **GET /api/supported-languages**: Get supported languages
 
 ### Example: Create a book from URL
 
@@ -101,7 +130,21 @@ Form data:
 POST /api/translations
 
 {
-  "book_id": 1
+  "book_id": 1,
+  "max_length": 400
+}
+```
+
+### Example: Create a paginated translation
+
+```json
+POST /api/translations/paginated
+
+{
+  "book_id": 1,
+  "page": 1,
+  "page_size": 2000,
+  "max_length": 400
 }
 ```
 
@@ -109,9 +152,18 @@ POST /api/translations
 
 The current implementation uses a mock ML translation function. To implement a real ML translation model:
 
-1. Update the `translate_text_with_ml` function in `translator/api.py`
+1. Update the `translate_text_with_ml` function in `translator/ml_translator.py`
 2. Integrate with your preferred ML translation library or API (e.g., Hugging Face Transformers, Google Translate API, etc.)
 3. Handle different file formats appropriately
+
+## Docker Environment
+
+The application includes a Docker setup for easy deployment:
+
+- Uses Python 3.13 slim as the base image
+- Installs all necessary dependencies for ML processing
+- Sets up proper directories for media storage
+- Exposes port 8000 for web access
 
 ## License
 
