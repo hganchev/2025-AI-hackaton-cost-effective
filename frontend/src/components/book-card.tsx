@@ -28,6 +28,8 @@ export const BookCard = ({
       'Self-Help': 'from-amber-500 to-orange-500',
       'Science Fiction': 'from-teal-500 to-emerald-500',
       'Biography': 'from-rose-500 to-pink-500',
+      'Romance': 'from-pink-500 to-rose-400',
+      'Fantasy': 'from-indigo-500 to-blue-400',
       'default': 'from-amber-600 to-amber-400'
     }
     
@@ -52,7 +54,7 @@ export const BookCard = ({
     return (
       <div className={cn("flex bg-white dark:bg-slate-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden group", className)}>
         <div className="w-1/3 md:w-1/4 relative h-auto min-h-[150px]">
-          {book.coverImage ? (
+          {book.coverImage && book.coverImage.trim() !== '' ? (
             <Image 
               src={book.coverImage} 
               alt={book.title}
@@ -116,7 +118,7 @@ export const BookCard = ({
       <Link href={`/books/${book.id}`} className="block h-full">
         <div className="aspect-[2/3] overflow-hidden relative">
           <div className="w-full h-full relative transform group-hover:scale-105 transition-transform duration-300">
-            {book.coverImage ? (
+            {book.coverImage && book.coverImage.trim() !== '' ? (
               <Image 
                 src={book.coverImage} 
                 alt={book.title}
