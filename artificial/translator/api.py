@@ -20,6 +20,7 @@ from .schemas import (
     ErrorResponse
 )
 from .models import Book, Translation
+from .extractor import BookExtractor
 
 api = NinjaAPI(title="Book Translator API", description="ML-based book translation API")
 
@@ -47,105 +48,6 @@ async def translate_text_with_ml(text: str, source_lang: str, target_lang: str) 
             
     return text + f" [Translated from {source_lang} to {target_lang}]"
 
-# File content extraction functions for different formats
-def extract_text_from_pdf(file_path):
-    """Extract text content from PDF files"""
-    try:
-        # In a real implementation, you would use a library like PyPDF2 or pdfminer.six
-        # Here we're just simulating the extraction
-        return f"[PDF Content extracted from {file_path}]\n\nThis is a simulation of PDF text extraction."
-    except Exception as e:
-        return f"Error extracting PDF content: {str(e)}"
-
-def extract_text_from_epub(file_path):
-    """Extract text content from EPUB files"""
-    try:
-        # In a real implementation, you would use a library like ebooklib
-        # Here we're just simulating the extraction
-        return f"[EPUB Content extracted from {file_path}]\n\nThis is a simulation of EPUB text extraction."
-    except Exception as e:
-        return f"Error extracting EPUB content: {str(e)}"
-
-def extract_text_from_docx(file_path):
-    """Extract text content from DOCX files"""
-    try:
-        # In a real implementation, you would use a library like python-docx
-        # Here we're just simulating the extraction
-        return f"[DOCX Content extracted from {file_path}]\n\nThis is a simulation of DOCX text extraction."
-    except Exception as e:
-        return f"Error extracting DOCX content: {str(e)}"
-
-def extract_text_from_txt(file_path):
-    """Extract text content from plain text files"""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    except UnicodeDecodeError:
-        # Try another common encoding if UTF-8 fails
-        try:
-            with open(file_path, 'r', encoding='latin-1') as f:
-                return f.read()
-        except Exception as e:
-            return f"Error extracting TXT content: {str(e)}"
-    except Exception as e:
-        return f"Error extracting TXT content: {str(e)}"
-
-def extract_text_from_html(file_path):
-    """Extract text content from HTML files"""
-    try:
-        # In a real implementation, you would use a library like BeautifulSoup
-        # Here we're just simulating the extraction with basic HTML tag removal
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        # Very basic HTML tag removal (for demonstration only)
-        content = re.sub(r'<[^>]+>', '', content)
-        return content
-    except Exception as e:
-        return f"Error extracting HTML content: {str(e)}"
-
-def extract_text_from_md(file_path):
-    """Extract text content from Markdown files"""
-    try:
-        # Markdown is already readable as plain text
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    except Exception as e:
-        return f"Error extracting Markdown content: {str(e)}"
-
-def extract_text_from_url(url):
-    """Extract text content from a URL (simulate downloading and processing)"""
-    try:
-        # In a real implementation, you would use requests to get the content
-        # and then process based on content type
-        # Here we're just simulating the extraction
-        return f"[Content extracted from URL: {url}]\n\nThis is a simulation of URL content extraction."
-    except Exception as e:
-        return f"Error extracting content from URL: {str(e)}"
-
-def extract_text_based_on_format(book):
-    """Extract text content from a book based on its format"""
-    if book.file:
-        file_path = book.file.path
-        if book.file_format == 'pdf':
-            return extract_text_from_pdf(file_path)
-        elif book.file_format == 'epub':
-            return extract_text_from_epub(file_path)
-        elif book.file_format == 'txt':
-            return extract_text_from_txt(file_path)
-        elif book.file_format == 'docx':
-            return extract_text_from_docx(file_path)
-        elif book.file_format == 'html':
-            return extract_text_from_html(file_path)
-        elif book.file_format == 'md':
-            return extract_text_from_md(file_path)
-        else:
-            # Default to treating as text file
-            return extract_text_from_txt(file_path)
-    elif book.url:
-        return extract_text_from_url(book.url)
-    else:
-        return "No content source available for this book."
-
 class FileFormatParams(Schema):
     """Schema for file format parameters"""
     title: str
@@ -163,7 +65,8 @@ def create_book_from_url(request: HttpRequest, book_data: BookCreateFromURL):
             author=book_data.author or "",
             source_language=book_data.source_language,
             target_language=book_data.target_language,
-            url=str(book_data.url)
+            url=str(book_data.url),
+            file_format=book_data.file_format
         )
         return 201, BookOut(
             id=book.id,
@@ -172,7 +75,8 @@ def create_book_from_url(request: HttpRequest, book_data: BookCreateFromURL):
             source_language=book.source_language,
             target_language=book.target_language,
             created_at=book.created_at,
-            url=book.url
+            url=book.url,
+            file_format=book.file_format
         )
     except Exception as e:
         return 400, ErrorResponse(detail=str(e))
@@ -184,7 +88,6 @@ def create_book_from_file(
     author: Optional[str] = None,
     source_language: str = "en",
     target_language: str = "es",
-    file_format: Optional[str] = None,
     file: UploadedFile = File(...)
 ):
     """Create a new book for translation from a file upload"""
@@ -228,7 +131,8 @@ def create_book_from_file(
             source_language=book.source_language,
             target_language=book.target_language,
             created_at=book.created_at,
-            file=book.file.url if book.file else None
+            file=book.file.url if book.file else None,
+            file_format=book.file_format
         )
     except Exception as e:
         return 400, ErrorResponse(detail=str(e))
@@ -246,7 +150,8 @@ def list_books(request: HttpRequest):
             target_language=book.target_language,
             created_at=book.created_at,
             url=book.url,
-            file=book.file.url if book.file else None
+            file=book.file.url if book.file else None,
+            file_format=book.file_format
         )
         for book in books
     ]
@@ -264,7 +169,8 @@ def get_book(request: HttpRequest, book_id: int):
             target_language=book.target_language,
             created_at=book.created_at,
             url=book.url,
-            file=book.file.url if book.file else None
+            file=book.file.url if book.file else None,
+            file_format=book.file_format
         )
     except Book.DoesNotExist:
         return 404, ErrorResponse(detail=f"Book with ID {book_id} not found")
@@ -282,8 +188,8 @@ async def create_translation(request: HttpRequest, translation_data: Translation
             status="processing"
         )
         
-        # Extract text content based on book format
-        content = extract_text_based_on_format(book)
+        # Extract text content using our new BookExtractor
+        content = BookExtractor.extract_from_book(book)
         
         # Perform mock ML translation
         translated_text = await translate_text_with_ml(
@@ -317,7 +223,8 @@ async def create_translation(request: HttpRequest, translation_data: Translation
                 target_language=book.target_language,
                 created_at=book.created_at,
                 url=book.url,
-                file=book.file.url if book.file else None
+                file=book.file.url if book.file else None,
+                file_format=book.file_format
             ),
             created_at=translation.created_at,
             updated_at=translation.updated_at,
@@ -345,7 +252,8 @@ def list_translations(request: HttpRequest):
                 target_language=translation.book.target_language,
                 created_at=translation.book.created_at,
                 url=translation.book.url,
-                file=translation.book.file.url if translation.book.file else None
+                file=translation.book.file.url if translation.book.file else None,
+                file_format=translation.book.file_format
             ),
             created_at=translation.created_at,
             updated_at=translation.updated_at,
@@ -371,7 +279,8 @@ def get_translation(request: HttpRequest, translation_id: int):
                 target_language=translation.book.target_language,
                 created_at=translation.book.created_at,
                 url=translation.book.url,
-                file=translation.book.file.url if translation.book.file else None
+                file=translation.book.file.url if translation.book.file else None,
+                file_format=translation.book.file_format
             ),
             created_at=translation.created_at,
             updated_at=translation.updated_at,
