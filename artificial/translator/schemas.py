@@ -13,6 +13,15 @@ class LanguageEnum(str, Enum):
     JAPANESE = "ja"
     KOREAN = "ko"
     ARABIC = "ar"
+    BULGARIAN = "bg"
+
+class FileFormatEnum(str, Enum):
+    PDF = "pdf"
+    EPUB = "epub"
+    TXT = "txt"
+    DOCX = "docx"
+    HTML = "html"
+    MARKDOWN = "md"
 
 class TranslationStatus(str, Enum):
     PENDING = "pending"
@@ -28,15 +37,18 @@ class BookBase(BaseModel):
 
 class BookCreateFromURL(BookBase):
     url: HttpUrl
+    file_format: Optional[FileFormatEnum] = None  # Optional format hint for URL content
 
 class BookCreateFromFile(BookBase):
     file_id: str  # Will be used to reference the uploaded file
+    file_format: FileFormatEnum
 
 class BookOut(BookBase):
     id: int
     created_at: datetime
     url: Optional[HttpUrl] = None
     file: Optional[str] = None
+    file_format: Optional[FileFormatEnum] = None
 
 class TranslationBase(BaseModel):
     book_id: int

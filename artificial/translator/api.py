@@ -1,4 +1,4 @@
-from ninja import NinjaAPI, File, UploadedFile
+from ninja import NinjaAPI, File, UploadedFile, Schema
 from ninja.responses import Response
 from typing import List, Dict, Any, Optional
 from django.http import HttpRequest
@@ -9,6 +9,10 @@ import uuid
 import json
 import asyncio
 from datetime import datetime
+import mimetypes
+import requests
+import re
+from pathlib import Path
 
 from .schemas import (
     BookBase, BookCreateFromURL, BookCreateFromFile, BookOut,
@@ -43,6 +47,113 @@ async def translate_text_with_ml(text: str, source_lang: str, target_lang: str) 
             
     return text + f" [Translated from {source_lang} to {target_lang}]"
 
+# File content extraction functions for different formats
+def extract_text_from_pdf(file_path):
+    """Extract text content from PDF files"""
+    try:
+        # In a real implementation, you would use a library like PyPDF2 or pdfminer.six
+        # Here we're just simulating the extraction
+        return f"[PDF Content extracted from {file_path}]\n\nThis is a simulation of PDF text extraction."
+    except Exception as e:
+        return f"Error extracting PDF content: {str(e)}"
+
+def extract_text_from_epub(file_path):
+    """Extract text content from EPUB files"""
+    try:
+        # In a real implementation, you would use a library like ebooklib
+        # Here we're just simulating the extraction
+        return f"[EPUB Content extracted from {file_path}]\n\nThis is a simulation of EPUB text extraction."
+    except Exception as e:
+        return f"Error extracting EPUB content: {str(e)}"
+
+def extract_text_from_docx(file_path):
+    """Extract text content from DOCX files"""
+    try:
+        # In a real implementation, you would use a library like python-docx
+        # Here we're just simulating the extraction
+        return f"[DOCX Content extracted from {file_path}]\n\nThis is a simulation of DOCX text extraction."
+    except Exception as e:
+        return f"Error extracting DOCX content: {str(e)}"
+
+def extract_text_from_txt(file_path):
+    """Extract text content from plain text files"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except UnicodeDecodeError:
+        # Try another common encoding if UTF-8 fails
+        try:
+            with open(file_path, 'r', encoding='latin-1') as f:
+                return f.read()
+        except Exception as e:
+            return f"Error extracting TXT content: {str(e)}"
+    except Exception as e:
+        return f"Error extracting TXT content: {str(e)}"
+
+def extract_text_from_html(file_path):
+    """Extract text content from HTML files"""
+    try:
+        # In a real implementation, you would use a library like BeautifulSoup
+        # Here we're just simulating the extraction with basic HTML tag removal
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        # Very basic HTML tag removal (for demonstration only)
+        content = re.sub(r'<[^>]+>', '', content)
+        return content
+    except Exception as e:
+        return f"Error extracting HTML content: {str(e)}"
+
+def extract_text_from_md(file_path):
+    """Extract text content from Markdown files"""
+    try:
+        # Markdown is already readable as plain text
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        return f"Error extracting Markdown content: {str(e)}"
+
+def extract_text_from_url(url):
+    """Extract text content from a URL (simulate downloading and processing)"""
+    try:
+        # In a real implementation, you would use requests to get the content
+        # and then process based on content type
+        # Here we're just simulating the extraction
+        return f"[Content extracted from URL: {url}]\n\nThis is a simulation of URL content extraction."
+    except Exception as e:
+        return f"Error extracting content from URL: {str(e)}"
+
+def extract_text_based_on_format(book):
+    """Extract text content from a book based on its format"""
+    if book.file:
+        file_path = book.file.path
+        if book.file_format == 'pdf':
+            return extract_text_from_pdf(file_path)
+        elif book.file_format == 'epub':
+            return extract_text_from_epub(file_path)
+        elif book.file_format == 'txt':
+            return extract_text_from_txt(file_path)
+        elif book.file_format == 'docx':
+            return extract_text_from_docx(file_path)
+        elif book.file_format == 'html':
+            return extract_text_from_html(file_path)
+        elif book.file_format == 'md':
+            return extract_text_from_md(file_path)
+        else:
+            # Default to treating as text file
+            return extract_text_from_txt(file_path)
+    elif book.url:
+        return extract_text_from_url(book.url)
+    else:
+        return "No content source available for this book."
+
+class FileFormatParams(Schema):
+    """Schema for file format parameters"""
+    title: str
+    author: Optional[str] = None
+    source_language: str = "en"
+    target_language: str = "es"
+    file_format: Optional[str] = None
+
 @api.post("/books/from-url", response={201: BookOut, 400: ErrorResponse})
 def create_book_from_url(request: HttpRequest, book_data: BookCreateFromURL):
     """Create a new book for translation from a URL"""
@@ -73,10 +184,21 @@ def create_book_from_file(
     author: Optional[str] = None,
     source_language: str = "en",
     target_language: str = "es",
+    file_format: Optional[str] = None,
     file: UploadedFile = File(...)
 ):
     """Create a new book for translation from a file upload"""
     try:
+        # Validate file extension
+        filename = file.name.lower()
+        valid_extensions = ['pdf', 'epub', 'txt', 'docx', 'html', 'md']
+        
+        # Get file extension
+        extension = Path(filename).suffix.lstrip('.')
+        
+        if extension not in valid_extensions:
+            return 400, ErrorResponse(detail=f"Unsupported file format. Supported formats: {', '.join(valid_extensions)}")
+        
         # Save the uploaded file
         file_name = f"{uuid.uuid4()}_{file.name}"
         file_path = os.path.join(settings.MEDIA_ROOT, 'books', file_name)
@@ -95,7 +217,8 @@ def create_book_from_file(
             author=author or "",
             source_language=source_language,
             target_language=target_language,
-            file=f"books/{file_name}"
+            file=f"books/{file_name}",
+            file_format=extension
         )
         
         return 201, BookOut(
@@ -159,22 +282,12 @@ async def create_translation(request: HttpRequest, translation_data: Translation
             status="processing"
         )
         
-        # In a real application, you would dispatch a background task here
-        # For this example, we'll simulate a quick translation process
-        
-        # Simulate retrieving text from either file or URL
-        if book.file:
-            # In a real application, you would parse the file contents based on format
-            sample_text = f"Sample text from file {book.file.name}"
-        elif book.url:
-            # In a real application, you would fetch and parse the content from URL
-            sample_text = f"Sample text from URL {book.url}"
-        else:
-            return 400, ErrorResponse(detail="Book has no file or URL source")
+        # Extract text content based on book format
+        content = extract_text_based_on_format(book)
         
         # Perform mock ML translation
         translated_text = await translate_text_with_ml(
-            sample_text, book.source_language, book.target_language
+            content, book.source_language, book.target_language
         )
         
         # Create the output file for the translation
