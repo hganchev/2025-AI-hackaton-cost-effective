@@ -18,44 +18,13 @@ from asgiref.sync import sync_to_async
 from .schemas import (
     BookBase, BookCreateFromURL, BookCreateFromFile, BookOut,
     TranslationBase, TranslationCreate, TranslationOut, TranslationList,
-    ErrorResponse
+    ErrorResponse, LanguageEnum
 )
 from .models import Book, Translation
 from .extractor import BookExtractor
+from .ml_translator import translate_text, get_supported_languages
 
 api = NinjaAPI(title="Book Translator API", description="ML-based book translation API")
-
-# Mock ML translation function (to be replaced with actual ML model implementation)
-async def translate_text_with_ml(text: str, source_lang: str, target_lang: str) -> str:
-    """
-    Mock function that simulates ML-based translation.
-    In a real implementation, this would use a proper ML model.
-    """
-    # Simulate processing time
-    await asyncio.sleep(1)
-    
-    # Very simple mock translation (just for demonstration)
-    if target_lang == "es" and source_lang == "en":
-        translation_map = {
-            "Hello": "Hola",
-            "world": "mundo",
-            "book": "libro",
-            "language": "idioma",
-            "translation": "traducción"
-        }
-        
-        for eng, span in translation_map.items():
-            text = text.replace(eng, span)
-            
-    return text + f" [Translated from {source_lang} to {target_lang}]"
-
-class FileFormatParams(Schema):
-    """Schema for file format parameters"""
-    title: str
-    author: Optional[str] = None
-    source_language: str = "en"
-    target_language: str = "es"
-    file_format: Optional[str] = None
 
 # Helper functions for synchronous database operations wrapped for async usage
 @sync_to_async
@@ -81,6 +50,19 @@ def update_translation_record(translation_id, status, file_path):
 def extract_text_sync(book):
     """Run the synchronous text extraction in an async-safe way"""
     return BookExtractor.extract_from_book(book)
+
+@sync_to_async
+def ml_translate_text_sync(text, source_lang, target_lang):
+    """Run the ML translation in an async-safe way"""
+    return translate_text(text, source_lang, target_lang)
+
+class FileFormatParams(Schema):
+    """Schema for file format parameters"""
+    title: str
+    author: Optional[str] = None
+    source_language: str = "en"
+    target_language: str = "es"
+    file_format: Optional[str] = None
 
 @api.post("/books/from-url", response={201: BookOut, 400: ErrorResponse})
 def create_book_from_url(request: HttpRequest, book_data: BookCreateFromURL):
@@ -217,8 +199,8 @@ async def create_translation(request: HttpRequest, translation_data: Translation
         # Extract text content using our BookExtractor (async-safe)
         content = await extract_text_sync(book)
         
-        # Perform mock ML translation
-        translated_text = await translate_text_with_ml(
+        # Perform ML translation using our ml_translator module
+        translated_text = await ml_translate_text_sync(
             content, book.source_language, book.target_language
         )
         
@@ -316,3 +298,8 @@ def get_translation(request: HttpRequest, translation_id: int):
         )
     except Translation.DoesNotExist:
         return 404, ErrorResponse(detail=f"Translation with ID {translation_id} not found")
+
+@api.get("/supported-languages", response=List[str])
+def supported_languages(request: HttpRequest):
+    """Get a list of supported languages for translation"""
+    return get_supported_languages()
