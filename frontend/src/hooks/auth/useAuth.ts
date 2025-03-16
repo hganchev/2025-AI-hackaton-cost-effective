@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, UserCredentials, UserRegistration } from '@/types';
+import { User, UserCredentials, UserRegistration } from '@/lib/types';
 import { authService } from '@/services/api/auth';
 import { setCookie, getCookie, removeCookie } from '@/utils/cookies';
 

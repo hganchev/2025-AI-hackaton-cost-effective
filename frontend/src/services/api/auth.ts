@@ -1,4 +1,4 @@
-import { UserRegistration, UserCredentials, AuthResponse } from '@/types';
+import { UserRegistration, UserCredentials, AuthResponse } from '@/lib/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 

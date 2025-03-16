@@ -1,7 +1,8 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect } from "react"
-import { Session, User, UserCredentials, UserRegistration } from "@/types"
+import { User, UserCredentials, UserRegistration } from "@/lib/types"
+import { Session } from "../types/index"
 import { api } from "./api"
 
 const SESSION_STORAGE_KEY = "bookapp_session"
