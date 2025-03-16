@@ -73,4 +73,33 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@keyframes fillHeartUpwards {
+  0% {
+    clip-path: inset(100% 0 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Анимация на сърцето във Favorites */
+.heart-fill {
+  clip-path: inset(100% 0 0 0);
+  transition: all 0.8s ease;
+  z-index: 1;
+  opacity: 0.9;
+}
+
+.group:hover .heart-fill {
+  clip-path: inset(0 0 0 0);
+}
+
+.group-hover\:clip-path-none {
+  clip-path: inset(100% 0 0 0);
+}
+
+.group:hover .group-hover\:clip-path-none {
+  clip-path: inset(0 0 0 0);
 } 

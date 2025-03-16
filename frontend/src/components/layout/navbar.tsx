@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
@@ -20,13 +20,17 @@ export function Navbar() {
   // Mock implementation for authContext instead of useAuth() which causes an error
   const mockAuth = {
     user: null,
-    isAuthenticated: false
+    isAuthenticated: true
   }
   
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
+  // Add state for profile menu
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  // Ref for profile menu detection
+  const profileMenuRef = useRef<HTMLDivElement>(null)
   // State for tracking changes
   const [lastUpdate, setLastUpdate] = useState(Date.now())
 
@@ -52,6 +56,25 @@ export function Navbar() {
       logoLink.textContent = 'BookReader'
     }
   }, [])
+
+  // Add click outside handler for profile menu
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false)
+      }
+    }
+
+    // Add event listener if menu is open
+    if (isProfileMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isProfileMenuOpen])
 
   const navItems: NavItem[] = [
     { name: "Home", href: "/" },
@@ -97,6 +120,11 @@ export function Navbar() {
     setIsLoginModalOpen(false)
   }
 
+  // Toggle profile menu
+  const toggleProfileMenu = () => {
+    setIsProfileMenuOpen(!isProfileMenuOpen)
+  }
+
   return (
     <header className="border-b bg-background sticky top-0 z-50">
       <div className="container mx-auto px-4">
@@ -136,26 +164,82 @@ export function Navbar() {
               />
             </form>
             
-            {/* Login and Registration buttons moved after search */}
-            <div className="flex items-center space-x-2" id="auth-buttons">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={openLoginModal}
-                className="flex items-center gap-1"
-              >
-                <LogIn className="h-4 w-4" />
-                <span>Login</span>
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={openRegisterModal}
-                className="flex items-center gap-1"
-              >
-                <UserPlus className="h-4 w-4" />
-                <span>Register</span>
-              </Button>
-            </div>
+            {/* Conditional rendering based on authentication status */}
+            {!mockAuth.isAuthenticated ? (
+              // Login and Registration buttons when not authenticated
+              <div className="flex items-center space-x-2" id="auth-buttons">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={openLoginModal}
+                  className="flex items-center gap-1"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span>Login</span>
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={openRegisterModal}
+                  className="flex items-center gap-1"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span>Register</span>
+                </Button>
+              </div>
+            ) : (
+              // User profile options when authenticated
+              <div className="hidden md:flex items-center space-x-4">
+                <Link 
+                  href="/favorites" 
+                  className="group flex items-center text-gray-600 hover:text-primary transition-colors duration-300"
+                >
+                  <span className="inline-flex items-center justify-center w-4 h-4 mr-1 relative">
+                    <Heart 
+                      className="w-4 h-4 stroke-current"
+                      fill="transparent"
+                    />
+                    <Heart 
+                      className="w-4 h-4 absolute inset-0 fill-red-500 stroke-red-500 heart-fill" 
+                    />
+                  </span>
+                  <span>Favorites</span>
+                </Link>
+                <Link href="/add-book" className="flex items-center text-gray-600 hover:text-primary">
+                  <PlusCircle className="w-4 h-4 mr-1" />
+                  <span>Add Book</span>
+                </Link>
+                <div className="relative" ref={profileMenuRef}>
+                  <button 
+                    className="flex items-center gap-2 p-1 rounded-full hover:bg-muted"
+                    onClick={toggleProfileMenu}
+                  >
+                    <div className="relative w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      <UserCircle className="w-6 h-6" />
+                    </div>
+                    <span className="font-medium">Profile</span>
+                  </button>
+                  
+                  {/* Dropdown menu */}
+                  <div className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-background border ${isProfileMenuOpen ? 'block' : 'hidden'}`}>
+                    <Link href="/profile" className="block px-4 py-2 text-sm hover:bg-muted">
+                      My Profile
+                    </Link>
+                    <Link href="/settings" className="block px-4 py-2 text-sm hover:bg-muted">
+                      Settings
+                    </Link>
+                    <button 
+                      className="w-full text-left block px-4 py-2 text-sm text-red-500 hover:bg-muted"
+                      onClick={() => console.log('Logout')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <LogOut className="w-4 h-4" />
+                        <span>Logout</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <ThemeToggle />
             
@@ -201,29 +285,80 @@ export function Navbar() {
                 </Link>
               ))}
               
-              {/* Mobile login/registration buttons */}
+              {/* Mobile authentication options */}
               <div className="pt-4 flex flex-col gap-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-center" 
-                  onClick={() => {
-                    openLoginModal();
-                    setIsMenuOpen(false);
-                  }}
-                >
-                  <LogIn className="h-4 w-4 mr-2" />
-                  <span>Login</span>
-                </Button>
-                <Button 
-                  className="w-full justify-center" 
-                  onClick={() => {
-                    openRegisterModal();
-                    setIsMenuOpen(false);
-                  }}
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  <span>Register</span>
-                </Button>
+                {!mockAuth.isAuthenticated ? (
+                  // Login and register buttons when not authenticated
+                  <>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-center" 
+                      onClick={() => {
+                        openLoginModal();
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      <LogIn className="h-4 w-4 mr-2" />
+                      <span>Login</span>
+                    </Button>
+                    <Button 
+                      className="w-full justify-center" 
+                      onClick={() => {
+                        openRegisterModal();
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      <span>Register</span>
+                    </Button>
+                  </>
+                ) : (
+                  // User profile options when authenticated
+                  <>
+                    <Link 
+                      href="/favorites" 
+                      onClick={() => setIsMenuOpen(false)}
+                      className="group flex items-center py-3 px-4 text-base font-medium text-gray-600 hover:text-primary hover:bg-gray-100 rounded-md transition-colors duration-300"
+                    >
+                      <span className="inline-flex items-center justify-center w-5 h-5 mr-3 relative">
+                        <Heart 
+                          className="w-5 h-5 stroke-current"
+                          fill="transparent"
+                        />
+                        <Heart 
+                          className="w-5 h-5 absolute inset-0 fill-red-500 stroke-red-500 heart-fill" 
+                        />
+                      </span>
+                      <span>Favorites</span>
+                    </Link>
+                    <Link 
+                      href="/add-book" 
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center py-3 px-4 text-base font-medium text-gray-600 hover:bg-gray-100 hover:text-primary rounded-md"
+                    >
+                      <PlusCircle className="w-5 h-5 mr-3" />
+                      <span>Add Book</span>
+                    </Link>
+                    <Link 
+                      href="/profile" 
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center py-3 px-4 text-base font-medium text-gray-600 hover:bg-gray-100 hover:text-primary rounded-md"
+                    >
+                      <UserCircle className="w-5 h-5 mr-3" />
+                      <span>Profile</span>
+                    </Link>
+                    <button 
+                      className="flex items-center py-3 px-4 text-base font-medium text-red-500 hover:bg-gray-100 rounded-md w-full text-left"
+                      onClick={() => {
+                        console.log('Logout');
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      <LogOut className="w-5 h-5 mr-3" />
+                      <span>Logout</span>
+                    </button>
+                  </>
+                )}
               </div>
             </nav>
           </div>
