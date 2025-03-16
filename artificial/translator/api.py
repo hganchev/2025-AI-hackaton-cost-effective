@@ -13,6 +13,7 @@ import mimetypes
 import requests
 import re
 from pathlib import Path
+from asgiref.sync import sync_to_async
 
 from .schemas import (
     BookBase, BookCreateFromURL, BookCreateFromFile, BookOut,
@@ -55,6 +56,31 @@ class FileFormatParams(Schema):
     source_language: str = "en"
     target_language: str = "es"
     file_format: Optional[str] = None
+
+# Helper functions for synchronous database operations wrapped for async usage
+@sync_to_async
+def get_book_by_id(book_id):
+    """Get a book by ID asynchronously"""
+    return Book.objects.get(id=book_id)
+
+@sync_to_async
+def create_translation_record(book, status="processing"):
+    """Create a translation record asynchronously"""
+    return Translation.objects.create(book=book, status=status)
+
+@sync_to_async
+def update_translation_record(translation_id, status, file_path):
+    """Update a translation record asynchronously"""
+    translation = Translation.objects.get(id=translation_id)
+    translation.status = status
+    translation.translated_file = file_path
+    translation.save()
+    return translation
+
+@sync_to_async
+def extract_text_sync(book):
+    """Run the synchronous text extraction in an async-safe way"""
+    return BookExtractor.extract_from_book(book)
 
 @api.post("/books/from-url", response={201: BookOut, 400: ErrorResponse})
 def create_book_from_url(request: HttpRequest, book_data: BookCreateFromURL):
@@ -179,17 +205,17 @@ def get_book(request: HttpRequest, book_id: int):
 async def create_translation(request: HttpRequest, translation_data: TranslationCreate):
     """Create a new translation job for a book"""
     try:
-        # Get the book
-        book = get_object_or_404(Book, id=translation_data.book_id)
+        # Get the book (async-safe)
+        try:
+            book = await get_book_by_id(translation_data.book_id)
+        except Book.DoesNotExist:
+            return 404, ErrorResponse(detail=f"Book with ID {translation_data.book_id} not found")
         
-        # Create a new translation record
-        translation = Translation.objects.create(
-            book=book,
-            status="processing"
-        )
+        # Create a new translation record (async-safe)
+        translation = await create_translation_record(book)
         
-        # Extract text content using our new BookExtractor
-        content = BookExtractor.extract_from_book(book)
+        # Extract text content using our BookExtractor (async-safe)
+        content = await extract_text_sync(book)
         
         # Perform mock ML translation
         translated_text = await translate_text_with_ml(
@@ -207,10 +233,12 @@ async def create_translation(request: HttpRequest, translation_data: Translation
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(translated_text)
         
-        # Update translation record
-        translation.status = "completed"
-        translation.translated_file = f"translations/{output_filename}"
-        translation.save()
+        # Update translation record (async-safe)
+        translation = await update_translation_record(
+            translation.id, 
+            "completed", 
+            f"translations/{output_filename}"
+        )
         
         # Return the response
         return 201, TranslationOut(
@@ -232,8 +260,6 @@ async def create_translation(request: HttpRequest, translation_data: Translation
             translated_file=translation.translated_file.url if translation.translated_file else None,
             error_message=translation.error_message
         )
-    except Book.DoesNotExist:
-        return 404, ErrorResponse(detail=f"Book with ID {translation_data.book_id} not found")
     except Exception as e:
         return 400, ErrorResponse(detail=str(e))
 
