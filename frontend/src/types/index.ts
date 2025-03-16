@@ -1,6 +1,37 @@
 import { ReactNode } from "react";
 
-// Типове за книги
+// Auth types
+export interface User {
+  id: string;
+  email: string;
+  role: 'user' | 'admin';
+}
+
+export interface UserCredentials {
+  email: string;
+  password: string;
+}
+
+export interface UserRegistration extends UserCredentials {
+  confirmPassword: string;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  data?: {
+    user: User;
+    token: string;
+  };
+  error?: string;
+}
+
+export interface Session {
+  user: User;
+  token: string;
+  expiresAt: number;
+}
+
+// Book types
 export interface Book {
   id: string;
   title: string;
@@ -16,38 +47,13 @@ export interface BookData extends Book {
   totalPages: number;
 }
 
-// Типове за потребители
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  role: 'user' | 'admin';
-}
-
-export interface UserCredentials {
-  email: string;
-  password: string;
-}
-
-export interface UserRegistration extends UserCredentials {
-  name: string;
-  confirmPassword: string;
-}
-
-export interface Session {
-  user: User;
-  token: string;
-  expiresAt: number;
-}
-
 export interface FavoriteBook {
   userId: string;
   bookId: string;
   addedAt: Date;
 }
 
-// Типове за компоненти
+// Component types
 export interface BookCardProps {
   book: Book;
 }
@@ -58,12 +64,11 @@ export interface BookReaderProps {
   }
 }
 
-// Типове за филтриране и сортиране
+// UI types
 export type ViewMode = 'grid' | 'list';
 export type SortOption = 'title' | 'author' | 'year';
 export type SortDirection = 'asc' | 'desc';
 
-// Други типове
 export interface NavItem {
   name: string;
   href: string;

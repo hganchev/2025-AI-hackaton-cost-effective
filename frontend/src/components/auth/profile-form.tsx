@@ -9,9 +9,7 @@ export function ProfileForm() {
   const { user, updateUser, logout } = useAuth()
   
   const [formData, setFormData] = useState<Partial<User>>({
-    name: user?.name || "",
-    email: user?.email || "",
-    avatar: user?.avatar || ""
+    email: user?.email || ""
   })
   
   const [error, setError] = useState<string | null>(null)
@@ -33,13 +31,13 @@ export function ProfileForm() {
       const result = await updateUser(formData)
       
       if (!result.success) {
-        setError(result.error || "Възникна грешка при запазването на данните.")
+        setError(result.error || "An error occurred while saving your data.")
         return
       }
       
-      setSuccess("Профилът беше успешно актуализиран.")
+      setSuccess("Profile successfully updated.")
     } catch (err) {
-      setError("Възникна грешка при запазването на данните.")
+      setError("An error occurred while saving your data.")
       console.error(err)
     } finally {
       setIsSubmitting(false)
@@ -49,9 +47,9 @@ export function ProfileForm() {
   return (
     <div className="w-full max-w-md mx-auto space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Моят профил</h1>
+        <h1 className="text-2xl font-bold">My Profile</h1>
         <p className="text-muted-foreground mt-2">
-          Редактирайте информацията за своя профил
+          Edit your profile information
         </p>
       </div>
       
@@ -69,23 +67,8 @@ export function ProfileForm() {
         )}
         
         <div className="space-y-2">
-          <label htmlFor="name" className="text-sm font-medium">
-            Име
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        </div>
-        
-        <div className="space-y-2">
           <label htmlFor="email" className="text-sm font-medium">
-            Имейл
+            Email
           </label>
           <input
             id="email"
@@ -98,28 +81,13 @@ export function ProfileForm() {
           />
         </div>
         
-        <div className="space-y-2">
-          <label htmlFor="avatar" className="text-sm font-medium">
-            URL на профилна снимка
-          </label>
-          <input
-            id="avatar"
-            name="avatar"
-            type="url"
-            value={formData.avatar || ""}
-            onChange={handleChange}
-            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="https://example.com/avatar.jpg"
-          />
-        </div>
-        
         <div className="pt-2 space-y-4">
           <Button 
             type="submit" 
             className="w-full"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Запазване..." : "Запази промените"}
+            {isSubmitting ? "Saving..." : "Save Changes"}
           </Button>
           
           <Button 
@@ -128,7 +96,7 @@ export function ProfileForm() {
             className="w-full"
             onClick={logout}
           >
-            Изход от профила
+            Sign Out
           </Button>
         </div>
       </form>
