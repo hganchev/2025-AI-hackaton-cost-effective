@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Backend services
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+  
+  backend:
+    build: ./backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    env_file:
+      - ./backend/.env
+    networks:
+      - app-network
+  
+  worker:
+    build: ./backend
+    command: python manage.py rundramatiq
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+    env_file:
+      - ./backend/.env
+    networks:
+      - app-network
+
+  # Artificial service (ML application)
+  artificial:
+    build: ./artificial
+    command: python manage.py runserver 0.0.0.0:8001
+    volumes:
+      - ./artificial:/app
+      - ml_models_data:/app/ml_models
+      - media_data:/app/media
+    ports:
+      - "8001:8001"
+    environment:
+      - DEBUG=1
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  ml_models_data:
+    # Persists the downloaded ML models between container restarts
+  media_data:
+    # Persists uploaded books and translations
+
+networks:
+  app-network:
+    driver: bridge
