@@ -1,7 +1,10 @@
 services:
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: >
+      bash -c "python manage.py wait_for_db &&
+               python manage.py migrate &&
+               python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
       # Create persistent volumes for media and model cache
@@ -14,8 +17,14 @@ services:
       - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - POSTGRES_DB=book_translator
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
     depends_on:
       - redis
+      - db
     restart: unless-stopped
 
   celery:
@@ -29,9 +38,15 @@ services:
       - DEBUG=1
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - POSTGRES_DB=book_translator
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
     depends_on:
       - web
       - redis
+      - db
     deploy:
       resources:
         limits:
@@ -64,9 +79,24 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
+    
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=book_translator
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB'
 
 volumes:
   ml_models_data:
     # This volume persists the downloaded ML models between container restarts
   redis_data:
     # This volume persists Redis data between container restarts
+  postgres_data:
+    # This volume persists PostgreSQL data between container restarts

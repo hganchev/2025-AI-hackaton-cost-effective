@@ -1,8 +1,9 @@
 from ninja import Router
-from typing import List
+from typing import List, Dict, Any
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 import os
 import uuid
 
@@ -30,17 +31,23 @@ def create_translation(request: HttpRequest, data: TranslationCreate):
         except Book.DoesNotExist:
             return 404, ErrorResponse(detail=f"Book with ID {data.book_id} not found")
         
+        print(f"Creating translation for book {book.id} ({book.title})")
+        
         # Create a new translation with pending status
         translation = Translation.objects.create(
             book=book,
-            status='pending',
+            status=TranslationStatus.PENDING.value,
             total_chunks=0,
             completed_chunks=0
         )
+
+        print(f"Created translation {translation.id}")
         
         # Get translation parameters
         max_length = data.max_length if hasattr(data, 'max_length') else 400
         chunk_size = data.chunk_size if hasattr(data, 'chunk_size') else 2000
+
+        print(f"Max length: {max_length}, Chunk size: {chunk_size}")    
         
         # Queue the task to prepare translation
         prepare_translation.delay(translation.id, max_length, chunk_size)
@@ -259,3 +266,67 @@ def get_translation_chunk(
         )
     except (Translation.DoesNotExist, TranslationChunk.DoesNotExist):
         return 404, ErrorResponse(detail=f"Translation chunk not found")
+
+@translations_api.get("/book/{book_id}/language/{language_code}", response={200: Dict[str, Any], 404: ErrorResponse})
+def get_full_translation(request: HttpRequest, book_id: int, language_code: str):
+    """
+    Retrieve the full translation text for a book by language
+    
+    Parameters:
+    - book_id: ID of the book
+    - language_code: ISO language code for the translation (e.g., 'es', 'fr')
+    
+    Optional query parameters:
+    - search: Text to search within the translation
+    """
+    try:
+        book = get_object_or_404(Book, id=book_id)
+    except Book.DoesNotExist:
+        return 404, ErrorResponse(detail=f"Book with ID {book_id} not found")
+    
+    # Get translations for this book in the specified language
+    translations = Translation.objects.filter(
+        book=book,
+        target_language=language_code
+    )
+    
+    if not translations.exists():
+        return 404, ErrorResponse(detail=f"No translations found for book {book_id} in language {language_code}")
+    
+    # Handle search if provided
+    search_query = request.query_params.get('search')
+    chunks = TranslationChunk.objects.filter(
+        translation__in=translations,
+        status='completed'
+    ).order_by('chunk_index')
+    
+    if search_query:
+        # Use PostgreSQL full-text search
+        vector = SearchVector('translated_text', weight='A')
+        query = SearchQuery(search_query)
+        
+        chunks = chunks.annotate(
+            search=vector,
+            rank=SearchRank(vector, query)
+        ).filter(search=query).order_by('-rank')
+    
+    # Organize the response
+    result = {
+        'book': {
+            'id': book.id,
+            'title': book.title,
+            'author': book.author,
+            'source_language': book.source_language
+        },
+        'target_language': language_code,
+        'chunks': []
+    }
+    
+    # Add each translated chunk
+    for chunk in chunks:
+        result['chunks'].append({
+            'chunk_index': chunk.chunk_index,
+            'content': chunk.translated_text
+        })
+    
+    return 200, result

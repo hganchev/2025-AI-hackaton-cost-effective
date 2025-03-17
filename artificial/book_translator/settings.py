@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',  # Add PostgreSQL specific fields
     # Custom apps
     'core',
     'books',
@@ -80,8 +81,12 @@ WSGI_APPLICATION = 'book_translator.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'book_translator'),
+        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'db'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
 
