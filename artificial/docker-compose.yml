@@ -49,9 +49,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.8'  # Limit to 80% of CPU
+          cpus: '5.0'  # Limit of CPU
         reservations:
-          cpus: '0.1'  # Guarantee at least 10% CPU
+          cpus: '1.0'  # Guarantee at least CPU
     restart: unless-stopped
 
   flower:
