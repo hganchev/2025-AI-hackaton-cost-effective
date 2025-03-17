@@ -19,7 +19,7 @@ from .schemas import (
     BookBase, BookCreateFromURL, BookCreateFromFile, BookOut,
     TranslationBase, TranslationCreate, TranslationOut, TranslationList,
     TranslationPaginatedOut, TranslationPaginatedCreate,
-    ErrorResponse, LanguageEnum
+    ErrorResponse, LanguageEnum, TranslationStatus 
 )
 from .models import Book, Translation
 from .extractor import BookExtractor
@@ -247,7 +247,7 @@ async def create_translation(request: HttpRequest, translation_data: Translation
             ),
             created_at=translation.created_at,
             updated_at=translation.updated_at,
-            status=translation.status,
+            status=TranslationStatus(translation.status),
             translated_file=translation.translated_file.url if translation.translated_file else None,
             error_message=translation.error_message
         )
@@ -284,7 +284,7 @@ async def create_paginated_translation(request: HttpRequest, translation_data: T
         
         # Create a translation record if this is the first page
         if page == 1:
-            translation = await create_translation_record(book, status="in_progress")
+            translation = await create_translation_record(book, status=TranslationStatus.PROCESSING.value)  
             
             # Create the output file for the translation
             output_filename = f"translation_{translation.id}_{uuid.uuid4()}.txt"
@@ -300,7 +300,7 @@ async def create_paginated_translation(request: HttpRequest, translation_data: T
             # Update translation record
             translation = await update_translation_record(
                 translation.id, 
-                "in_progress" if translation_result["has_next"] else "completed", 
+                TranslationStatus.PROCESSING.value if translation_result["has_next"] else TranslationStatus.COMPLETED.value,  
                 f"translations/{output_filename}"
             )
         else:
@@ -317,7 +317,7 @@ async def create_paginated_translation(request: HttpRequest, translation_data: T
                     f.write("\n\n" + translation_result["translated_text"])
                 
                 # Update translation status
-                translation.status = "in_progress" if translation_result["has_next"] else "completed"
+                translation.status = TranslationStatus.PROCESSING.value if translation_result["has_next"] else TranslationStatus.COMPLETED.value
                 translation.save()
         
         # Return the response
@@ -336,7 +336,7 @@ async def create_paginated_translation(request: HttpRequest, translation_data: T
             ),
             created_at=translation.created_at,
             updated_at=translation.updated_at,
-            status=translation.status,
+            status=TranslationStatus(translation.status),
             translated_file=translation.translated_file.url if translation.translated_file else None,
             error_message=translation.error_message,
             total_pages=translation_result["total_pages"],
@@ -367,7 +367,7 @@ def list_translations(request: HttpRequest):
             ),
             created_at=translation.created_at,
             updated_at=translation.updated_at,
-            status=translation.status,
+            status=TranslationStatus(translation.status),
             translated_file=translation.translated_file.url if translation.translated_file else None,
             error_message=translation.error_message
         )
@@ -394,7 +394,7 @@ def get_translation(request: HttpRequest, translation_id: int):
             ),
             created_at=translation.created_at,
             updated_at=translation.updated_at,
-            status=translation.status,
+            status=TranslationStatus(translation.status),
             translated_file=translation.translated_file.url if translation.translated_file else None,
             error_message=translation.error_message
         )
