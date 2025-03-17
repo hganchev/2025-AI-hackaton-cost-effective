@@ -20,8 +20,7 @@ services:
 
   celery:
     build: .
-    # command: ["celery", "-A", "book_translator", "worker", "--concurrency", "16", "-l", "info"]
-    command: ["celery", "-A", "book_translator", "worker", "-l", "info"]
+    command: ["celery", "-A", "book_translator", "worker", "-l", "info", "--concurrency=4", "--pool=prefork"]
     volumes:
       - .:/app
       - ml_models_data:/app/ml_models
@@ -33,6 +32,12 @@ services:
     depends_on:
       - web
       - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'  # Limit to 80% of CPU
+        reservations:
+          cpus: '0.1'  # Guarantee at least 10% CPU
     restart: unless-stopped
 
   flower:
