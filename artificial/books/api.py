@@ -1,4 +1,4 @@
-from ninja import NinjaAPI, File, UploadedFile
+from ninja import Router, File, UploadedFile
 from typing import List
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -15,7 +15,7 @@ from .schemas import (
 from .tasks import download_book_from_url
 
 # Create the API router for the books app
-books_api = NinjaAPI(urls_namespace="books")
+books_api = Router(tags=["Books"])
 
 @books_api.post("/from-url", response={201: BookOut, 400: ErrorResponse})
 def create_book_from_url(request: HttpRequest, book_data: BookCreateFromURL):

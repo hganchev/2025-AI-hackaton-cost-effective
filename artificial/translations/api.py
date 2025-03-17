@@ -1,4 +1,4 @@
-from ninja import NinjaAPI
+from ninja import Router
 from typing import List
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -15,9 +15,10 @@ from .schemas import (
     TranslationPaginatedOut, ErrorResponse, TranslationStatus
 )
 from .tasks import prepare_translation, translate_chunk
+from core.ml_translator import get_supported_languages
 
 # Create the API router for the translations app
-translations_api = NinjaAPI(urls_namespace="translations")
+translations_api = Router(tags=["Translations"])
 
 @translations_api.post("", response={201: TranslationOut, 400: ErrorResponse, 404: ErrorResponse})
 def create_translation(request: HttpRequest, data: TranslationCreate):
