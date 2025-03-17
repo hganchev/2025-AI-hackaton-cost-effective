@@ -4,15 +4,13 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
-import os
-import uuid
 
 from books.models import Book
 from books.schemas import BookOut
 from .models import Translation, TranslationChunk
 from .schemas import (
-    TranslationBase, TranslationCreate, TranslationOut,
-    TranslationDetailOut, TranslationChunkOut, TranslationList,
+    TranslationCreate, TranslationOut,
+    TranslationDetailOut, TranslationChunkOut,
     TranslationPaginatedOut, ErrorResponse, TranslationStatus
 )
 from .tasks import prepare_translation, translate_chunk
@@ -31,8 +29,6 @@ def create_translation(request: HttpRequest, data: TranslationCreate):
         except Book.DoesNotExist:
             return 404, ErrorResponse(detail=f"Book with ID {data.book_id} not found")
         
-        print(f"Creating translation for book {book.id} ({book.title})")
-        
         # Create a new translation with pending status
         translation = Translation.objects.create(
             book=book,
@@ -40,14 +36,10 @@ def create_translation(request: HttpRequest, data: TranslationCreate):
             total_chunks=0,
             completed_chunks=0
         )
-
-        print(f"Created translation {translation.id}")
         
         # Get translation parameters
         max_length = data.max_length if hasattr(data, 'max_length') else 400
         chunk_size = data.chunk_size if hasattr(data, 'chunk_size') else 2000
-
-        print(f"Max length: {max_length}, Chunk size: {chunk_size}")    
         
         # Queue the task to prepare translation
         prepare_translation.delay(translation.id, max_length, chunk_size)

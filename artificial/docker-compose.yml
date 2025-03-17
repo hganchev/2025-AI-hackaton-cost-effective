@@ -29,7 +29,7 @@ services:
 
   celery:
     build: .
-    command: ["celery", "-A", "book_translator", "worker", "-l", "info", "--concurrency=8", "--pool=prefork"]
+    command: ["celery", "-A", "book_translator", "worker", "-l", "info", "--concurrency=8", "--pool=prefork", "-E"]
     volumes:
       - .:/app
       - ml_models_data:/app/ml_models
@@ -44,7 +44,6 @@ services:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
     depends_on:
-      - web
       - redis
       - db
     deploy:
@@ -81,7 +80,7 @@ services:
     restart: unless-stopped
     
   db:
-    image: postgres:15
+    image: postgres:latest
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
