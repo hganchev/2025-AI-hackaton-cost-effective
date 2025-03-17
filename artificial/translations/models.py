@@ -18,6 +18,8 @@ class Translation(models.Model):
     )
     translated_file = models.FileField(upload_to='translations/', null=True, blank=True)
     error_message = models.TextField(blank=True)
+    total_chunks = models.IntegerField(default=0)
+    completed_chunks = models.IntegerField(default=0)
     
     def __str__(self):
         return f"Translation of {self.book.title} - {self.status}"
