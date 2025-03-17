@@ -14,6 +14,7 @@ import requests
 import re
 from pathlib import Path
 from asgiref.sync import sync_to_async
+from celery import shared_task
 
 from .schemas import (
     BookBase, BookCreateFromURL, BookCreateFromFile, BookOut,
@@ -23,7 +24,7 @@ from .schemas import (
 )
 from .models import Book, Translation
 from .extractor import BookExtractor
-from .ml_translator import translate_text, translate_text_paginated, get_supported_languages
+from .ml_translator import translate_text, translate_text_paginated, get_supported_languages, split_text_into_chunks
 
 api = NinjaAPI(title="Book Translator API", description="ML-based book translation API")
 
@@ -69,6 +70,89 @@ class FileFormatParams(Schema):
     source_language: str = "en"
     target_language: str = "es"
     file_format: Optional[str] = None
+
+# Celery task for translating book chunks
+@shared_task
+def translate_book_chunks(translation_id, book_id, max_length=400):
+    """
+    Celery task to translate a book in chunks and save results incrementally
+    """
+    try:
+        book = Book.objects.get(id=book_id)
+        translation = Translation.objects.get(id=translation_id)
+        
+        # Extract text content from the book
+        content = BookExtractor.extract_from_book(book)
+        
+        # Split text into manageable chunks
+        chunk_size = 2000  # Characters per chunk
+        chunks = split_text_into_chunks(content, chunk_size)
+        total_chunks = len(chunks)
+        
+        # Create the output file for the translation if it doesn't exist
+        if not translation.translated_file:
+            output_filename = f"translation_{translation.id}_{uuid.uuid4()}.txt"
+            output_path = os.path.join(settings.MEDIA_ROOT, 'translations', output_filename)
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Save an empty file to start with
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write("")
+            
+            # Update translation record with file path
+            translation.translated_file = f"translations/{output_filename}"
+            translation.save()
+        
+        # Get the file path to append translations to
+        file_path = os.path.join(settings.MEDIA_ROOT, translation.translated_file.name)
+        
+        # Translate each chunk and append to file
+        for i, chunk in enumerate(chunks):
+            # Translate the chunk
+            translated_chunk = translate_text(
+                chunk, 
+                book.source_language, 
+                book.target_language, 
+                max_length=max_length
+            )
+            
+            # Append to the translation file
+            with open(file_path, 'a', encoding='utf-8') as f:
+                if i > 0:
+                    f.write("\n\n")
+                f.write(translated_chunk)
+            
+            # Update progress status
+            progress = min(99, int((i + 1) / total_chunks * 100))
+            translation.status = TranslationStatus.PROCESSING.value if progress < 99 else TranslationStatus.COMPLETED.value
+            translation.save()
+        
+        # Mark as completed when done
+        translation.status = TranslationStatus.COMPLETED.value
+        translation.save()
+        
+        return {
+            "success": True, 
+            "translation_id": translation.id,
+            "chunks_translated": total_chunks
+        }
+    
+    except Exception as e:
+        # Update translation with error status
+        try:
+            translation = Translation.objects.get(id=translation_id)
+            translation.status = TranslationStatus.FAILED.value
+            translation.error_message = str(e)
+            translation.save()
+        except:
+            pass
+        
+        return {
+            "success": False, 
+            "error": str(e)
+        }
 
 @api.post("/books/from-url", response={201: BookOut, 400: ErrorResponse})
 def create_book_from_url(request: HttpRequest, book_data: BookCreateFromURL):
@@ -190,48 +274,32 @@ def get_book(request: HttpRequest, book_id: int):
         return 404, ErrorResponse(detail=f"Book with ID {book_id} not found")
 
 @api.post("/translations", response={201: TranslationOut, 400: ErrorResponse})
-async def create_translation(request: HttpRequest, translation_data: TranslationCreate):
-    """Create a new translation job for a book"""
+def create_translation(request: HttpRequest, translation_data: TranslationCreate):
+    """Create a new translation job for a book using Celery for async processing"""
     try:
-        # Get the book (async-safe)
+        # Get the book
         try:
-            book = await get_book_by_id(translation_data.book_id)
+            book = Book.objects.get(id=translation_data.book_id)
         except Book.DoesNotExist:
             return 404, ErrorResponse(detail=f"Book with ID {translation_data.book_id} not found")
         
-        # Create a new translation record (async-safe)
-        translation = await create_translation_record(book)
-        
-        # Extract text content using our BookExtractor (async-safe)
-        content = await extract_text_sync(book)
+        # Create a new translation record with pending status
+        translation = Translation.objects.create(
+            book=book, 
+            status=TranslationStatus.PENDING.value
+        )
         
         # Get max length from request, default to 400 if not provided
         max_length = translation_data.max_length if hasattr(translation_data, 'max_length') else 400
         
-        # Perform ML translation using our ml_translator module
-        translated_text = await ml_translate_text_sync(
-            content, book.source_language, book.target_language, max_length=max_length
+        # Queue the Celery task to process the translation in chunks
+        translate_book_chunks.delay(
+            translation.id,
+            book.id,
+            max_length
         )
         
-        # Create the output file for the translation
-        output_filename = f"translation_{translation.id}_{uuid.uuid4()}.txt"
-        output_path = os.path.join(settings.MEDIA_ROOT, 'translations', output_filename)
-        
-        # Ensure the directory exists
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        # Save the translated content to a file
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(translated_text)
-        
-        # Update translation record (async-safe)
-        translation = await update_translation_record(
-            translation.id, 
-            "completed", 
-            f"translations/{output_filename}"
-        )
-        
-        # Return the response
+        # Return the translation object immediately
         return 201, TranslationOut(
             id=translation.id,
             book=BookOut(
@@ -248,101 +316,75 @@ async def create_translation(request: HttpRequest, translation_data: Translation
             created_at=translation.created_at,
             updated_at=translation.updated_at,
             status=TranslationStatus(translation.status),
-            translated_file=translation.translated_file.url if translation.translated_file else None,
+            translated_file=None,  # Will be populated by the Celery task
             error_message=translation.error_message
         )
     except Exception as e:
         return 400, ErrorResponse(detail=str(e))
 
-@api.post("/translations/paginated", response={201: TranslationPaginatedOut, 400: ErrorResponse})
-async def create_paginated_translation(request: HttpRequest, translation_data: TranslationPaginatedCreate):
-    """Create a paginated translation for a book (translate one page at a time)"""
+@api.get("/translations/paginated", response={200: TranslationPaginatedOut, 404: ErrorResponse})
+def get_paginated_translation(
+    request: HttpRequest, 
+    translation_id: int,
+    page: int = 1,
+    page_size: int = 2000
+):
+    """Get a specific page of a translated book"""
     try:
-        # Get the book (async-safe)
-        try:
-            book = await get_book_by_id(translation_data.book_id)
-        except Book.DoesNotExist:
-            return 404, ErrorResponse(detail=f"Book with ID {translation_data.book_id} not found")
-        
-        # Extract text content using our BookExtractor (async-safe)
-        content = await extract_text_sync(book)
-        
-        # Set default values
-        page = translation_data.page if hasattr(translation_data, 'page') else 1
-        page_size = translation_data.page_size if hasattr(translation_data, 'page_size') else 2000
-        max_length = translation_data.max_length if hasattr(translation_data, 'max_length') else 400
-        
-        # Perform paginated ML translation
-        translation_result = await ml_translate_paginated_sync(
-            content, 
-            book.source_language, 
-            book.target_language,
-            page=page,
-            page_size=page_size,
-            max_length=max_length
+        # Find the translation
+        translation = get_object_or_404(
+            Translation.objects.select_related('book'),
+            id=translation_id
         )
         
-        # Create a translation record if this is the first page
-        if page == 1:
-            translation = await create_translation_record(book, status=TranslationStatus.PROCESSING.value)  
-            
-            # Create the output file for the translation
-            output_filename = f"translation_{translation.id}_{uuid.uuid4()}.txt"
-            output_path = os.path.join(settings.MEDIA_ROOT, 'translations', output_filename)
-            
-            # Ensure the directory exists
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            
-            # Save the translated content to a file
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(translation_result["translated_text"])
-            
-            # Update translation record
-            translation = await update_translation_record(
-                translation.id, 
-                TranslationStatus.PROCESSING.value if translation_result["has_next"] else TranslationStatus.COMPLETED.value,  
-                f"translations/{output_filename}"
-            )
-        else:
-            # Find existing translation for this book
-            translation = get_object_or_404(
-                Translation.objects.filter(book=book).order_by('-created_at'), 
-                book=book
-            )
-            
-            # Append to the existing translation file
-            if translation.translated_file:
-                file_path = os.path.join(settings.MEDIA_ROOT, translation.translated_file.name)
-                with open(file_path, 'a', encoding='utf-8') as f:
-                    f.write("\n\n" + translation_result["translated_text"])
-                
-                # Update translation status
-                translation.status = TranslationStatus.PROCESSING.value if translation_result["has_next"] else TranslationStatus.COMPLETED.value
-                translation.save()
+        # Check if the translation file exists
+        if not translation.translated_file:
+            return 404, ErrorResponse(detail="Translation file not found")
         
-        # Return the response
-        return 201, TranslationPaginatedOut(
+        # Get the file path
+        file_path = os.path.join(settings.MEDIA_ROOT, translation.translated_file.name)
+        if not os.path.exists(file_path):
+            return 404, ErrorResponse(detail="Translation file not found on disk")
+        
+        # Read the translation file
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Calculate pagination
+        total_chars = len(content)
+        total_pages = max(1, (total_chars + page_size - 1) // page_size)
+        
+        # Ensure page is within bounds
+        page = max(1, min(page, total_pages))
+        
+        # Extract the requested page of content
+        start_idx = (page - 1) * page_size
+        end_idx = min(start_idx + page_size, total_chars)
+        page_content = content[start_idx:end_idx]
+        
+        # Create response
+        return 200, TranslationPaginatedOut(
             id=translation.id,
             book=BookOut(
-                id=book.id,
-                title=book.title,
-                author=book.author,
-                source_language=book.source_language,
-                target_language=book.target_language,
-                created_at=book.created_at,
-                url=book.url,
-                file=book.file.url if book.file else None,
-                file_format=book.file_format
+                id=translation.book.id,
+                title=translation.book.title,
+                author=translation.book.author,
+                source_language=translation.book.source_language,
+                target_language=translation.book.target_language,
+                created_at=translation.book.created_at,
+                url=translation.book.url,
+                file=translation.book.file.url if translation.book.file else None,
+                file_format=translation.book.file_format
             ),
             created_at=translation.created_at,
             updated_at=translation.updated_at,
             status=TranslationStatus(translation.status),
             translated_file=translation.translated_file.url if translation.translated_file else None,
             error_message=translation.error_message,
-            total_pages=translation_result["total_pages"],
-            current_page=translation_result["current_page"],
-            has_next=translation_result["has_next"],
-            has_previous=translation_result["has_previous"]
+            total_pages=total_pages,
+            current_page=page,
+            has_next=page < total_pages,
+            has_previous=page > 1
         )
     except Exception as e:
         return 400, ErrorResponse(detail=str(e))

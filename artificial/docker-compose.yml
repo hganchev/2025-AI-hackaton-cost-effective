@@ -8,18 +8,44 @@ services:
       - .:/app
       # Create persistent volumes for media and model cache
       - ml_models_data:/app/ml_models
-      # - media_data:/app/media
       - ./media:/app/media
-      # - ./ml_models:/app/ml_models
     ports:
       - "8000:8000"
     environment:
       - DEBUG=1
       - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  celery:
+    build: .
+    command: ["celery -A book_translator worker","--concurrency", "16", "-l", "info"]
+    volumes:
+      - .:/app
+      - ml_models_data:/app/ml_models
+      - ./media:/app/media
+    environment:
+      - DEBUG=1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - web
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
 
 volumes:
   ml_models_data:
     # This volume persists the downloaded ML models between container restarts
-  # media_data:
-  #   # This volume persists uploaded books and translations
+  redis_data:
+    # This volume persists Redis data between container restarts
