@@ -134,8 +134,27 @@ def list_translations_by_book(request: HttpRequest, book_id: int):
 def get_translation(request: HttpRequest, translation_id: int):
     """Get details of a specific translation including its chunks"""
     try:
-        translation = get_object_or_404(Translation, id=translation_id)
-        chunks = TranslationChunk.objects.filter(translation=translation).order_by('chunk_index')
+        # Use select_related to fetch book in the same query
+        translation = get_object_or_404(
+            Translation.objects.select_related('book'),
+            id=translation_id
+        )
+        
+        # Optimize chunk query with annotated status counts
+        chunks = (TranslationChunk.objects
+                 .filter(translation=translation)
+                 .order_by('chunk_index')
+                 .defer('original_text')  # Don't load original_text as it's not needed
+                 .only(
+                     'id', 'chunk_index', 'status', 'translated_text',
+                     'created_at', 'updated_at', 'error_message'
+                 ))
+        
+        # Get completed chunks count efficiently using count() with filter
+        completed_chunks = TranslationChunk.objects.filter(
+            translation=translation,
+            status=TranslationStatus.COMPLETED.value
+        ).count()
         
         return 200, TranslationDetailOut(
             id=translation.id,
@@ -153,8 +172,8 @@ def get_translation(request: HttpRequest, translation_id: int):
             created_at=translation.created_at,
             updated_at=translation.updated_at,
             status=TranslationStatus(translation.status),
-            total_chunks=getattr(translation, 'total_chunks', len(chunks)),
-            completed_chunks=getattr(translation, 'completed_chunks', len([c for c in chunks if c.status == 'completed'])),
+            total_chunks=translation.total_chunks,
+            completed_chunks=completed_chunks,
             error_message=translation.error_message,
             chunks=[
                 TranslationChunkOut(

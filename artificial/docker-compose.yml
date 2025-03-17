@@ -20,7 +20,7 @@ services:
 
   celery:
     build: .
-    command: ["celery", "-A", "book_translator", "worker", "-l", "info", "--concurrency=4", "--pool=prefork"]
+    command: ["celery", "-A", "book_translator", "worker", "-l", "info", "--concurrency=8", "--pool=prefork"]
     volumes:
       - .:/app
       - ml_models_data:/app/ml_models
