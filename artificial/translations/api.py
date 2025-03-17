@@ -4,6 +4,7 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
+import logging
 
 from books.models import Book
 from books.schemas import BookOut
@@ -18,6 +19,9 @@ from core.ml_translator import get_supported_languages
 
 # Create the API router for the translations app
 translations_api = Router(tags=["Translations"])
+
+# Create a logger for this module
+api_logger = logging.getLogger(__name__)
 
 @translations_api.post("", response={201: TranslationOut, 400: ErrorResponse, 404: ErrorResponse})
 def create_translation(request: HttpRequest, data: TranslationCreate):
@@ -41,8 +45,11 @@ def create_translation(request: HttpRequest, data: TranslationCreate):
         max_length = data.max_length if hasattr(data, 'max_length') else 400
         chunk_size = data.chunk_size if hasattr(data, 'chunk_size') else 2000
         
-        # Queue the task to prepare translation
-        prepare_translation.delay(translation.id, max_length, chunk_size)
+        # Queue the task to prepare translation with explicit logging
+        task = prepare_translation.apply_async(
+            args=[translation.id, max_length, chunk_size],
+            countdown=1  # Adding a small delay to ensure task is properly queued
+        )
         
         # Return the translation details
         return 201, TranslationOut(
@@ -66,6 +73,7 @@ def create_translation(request: HttpRequest, data: TranslationCreate):
             error_message=translation.error_message
         )
     except Exception as e:
+        api_logger.exception("Error creating translation", exc_info=e)
         return 400, ErrorResponse(detail=str(e))
 
 @translations_api.get("", response=List[TranslationOut])
@@ -127,6 +135,7 @@ def list_translations_by_book(request: HttpRequest, book_id: int):
             for translation in translations
         ]
     except Book.DoesNotExist:
+        api_logger.error(f"Book with ID {book_id} not found")
         return []
 
 @translations_api.get("/{translation_id}", response={200: TranslationDetailOut, 404: ErrorResponse})
@@ -188,6 +197,7 @@ def get_translation(request: HttpRequest, translation_id: int):
             ]
         )
     except Translation.DoesNotExist:
+        api_logger.error(f"Translation with ID {translation_id} not found")
         return 404, ErrorResponse(detail=f"Translation with ID {translation_id} not found")
 
 @translations_api.get("/{translation_id}/paginated", response={200: TranslationPaginatedOut, 404: ErrorResponse})
@@ -234,6 +244,7 @@ def get_paginated_translation(
             has_previous=page > 1
         )
     except Translation.DoesNotExist:
+        api_logger.error(f"Translation with ID {translation_id} not found")
         return 404, ErrorResponse(detail=f"Translation with ID {translation_id} not found")
 
 @translations_api.get("/{translation_id}/chunk/{chunk_index}", response={200: TranslationChunkOut, 404: ErrorResponse})
@@ -257,6 +268,7 @@ def get_translation_chunk(
             error_message=chunk.error_message
         )
     except (Translation.DoesNotExist, TranslationChunk.DoesNotExist):
+        api_logger.error(f"Translation chunk not found for translation {translation_id} and index {chunk_index}")
         return 404, ErrorResponse(detail=f"Translation chunk not found")
 
 @translations_api.get("/book/{book_id}/language/{language_code}", response={200: Dict[str, Any], 404: ErrorResponse})
@@ -274,6 +286,7 @@ def get_full_translation(request: HttpRequest, book_id: int, language_code: str)
     try:
         book = get_object_or_404(Book, id=book_id)
     except Book.DoesNotExist:
+        api_logger.error(f"Book with ID {book_id} not found")
         return 404, ErrorResponse(detail=f"Book with ID {book_id} not found")
     
     # Get translations for this book in the specified language
@@ -283,6 +296,7 @@ def get_full_translation(request: HttpRequest, book_id: int, language_code: str)
     )
     
     if not translations.exists():
+        api_logger.error(f"No translations found for book {book_id} in language {language_code}")
         return 404, ErrorResponse(detail=f"No translations found for book {book_id} in language {language_code}")
     
     # Handle search if provided

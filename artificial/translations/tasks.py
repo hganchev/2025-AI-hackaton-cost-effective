@@ -19,16 +19,21 @@ def prepare_translation(translation_id, max_length=400, chunk_size=2000):
     """
     Prepare a translation by extracting the book content and creating chunk tasks
     """
+    logger.info(f"Starting prepare_translation task for translation_id={translation_id}")
     try:
         # Get the translation and related book
         translation = Translation.objects.get(id=translation_id)
         book = translation.book
+        
+        # Log translation details
+        logger.info(f"Found translation {translation_id} for book '{book.title}' (ID: {book.id})")
         
         # Update translation status
         translation.status = TranslationStatus.PROCESSING.value
         translation.save()
         
         # Extract content from book
+        logger.info(f"Extracting content from book {book.id}")
         content = BookExtractor.extract_from_book(book)
         
         # Split content into chunks
