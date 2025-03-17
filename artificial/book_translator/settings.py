@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Custom apps
-    'translator',
+    'core',
+    'books',
+    'translations',
 ]
 
 MIDDLEWARE = [

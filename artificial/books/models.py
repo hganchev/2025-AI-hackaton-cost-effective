@@ -63,24 +63,3 @@ class Book(models.Model):
             elif filename.endswith('.md'):
                 self.file_format = 'md'
         super().save(*args, **kwargs)
-    
-class Translation(models.Model):
-    """Model representing a translation of a book"""
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='translations')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ('pending', 'Pending'),
-            ('processing', 'Processing'),
-            ('completed', 'Completed'),
-            ('failed', 'Failed')
-        ],
-        default='pending'
-    )
-    translated_file = models.FileField(upload_to='translations/', null=True, blank=True)
-    error_message = models.TextField(blank=True)
-    
-    def __str__(self):
-        return f"Translation of {self.book.title} - {self.status}"

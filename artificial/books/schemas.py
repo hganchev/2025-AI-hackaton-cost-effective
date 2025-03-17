@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, HttpUrl
-from typing import Optional, List, Union
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
@@ -23,12 +23,6 @@ class FileFormatEnum(str, Enum):
     HTML = "html"
     MARKDOWN = "md"
 
-class TranslationStatus(str, Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed" 
-    FAILED = "failed"
-
 class BookBase(BaseModel):
     title: str
     author: Optional[str] = None
@@ -50,34 +44,8 @@ class BookOut(BookBase):
     file: Optional[str] = None
     file_format: Optional[FileFormatEnum] = None
 
-class TranslationBase(BaseModel):
-    book_id: int
-
-class TranslationOut(BaseModel):
-    id: int
-    book: BookOut
-    created_at: datetime
-    updated_at: datetime
-    status: TranslationStatus
-    translated_file: Optional[str] = None
-    error_message: Optional[str] = None
-
-class TranslationCreate(BaseModel):
-    book_id: int
-    max_length: Optional[int] = 400  # Maximum length of tokens for translation
-    
-class TranslationPaginatedCreate(TranslationCreate):
-    page: int = 1  # Start with page 1
-    page_size: int = 2000  # Characters per page
-
-class TranslationPaginatedOut(TranslationOut):
-    total_pages: int
-    current_page: int
-    has_next: bool
-    has_previous: bool
-
-class TranslationList(BaseModel):
-    translations: List[TranslationOut]
+class BookList(BaseModel):
+    books: List[BookOut]
 
 class ErrorResponse(BaseModel):
     detail: str
