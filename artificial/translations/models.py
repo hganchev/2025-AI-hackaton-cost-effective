@@ -1,5 +1,6 @@
 from django.db import models
 from books.models import Book
+from .schemas import TranslationStatus
 
 class Translation(models.Model):
     """Model representing a translation of a book"""
@@ -8,13 +9,8 @@ class Translation(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     status = models.CharField(
         max_length=20,
-        choices=[
-            ('pending', 'Pending'),
-            ('processing', 'Processing'),
-            ('completed', 'Completed'),
-            ('failed', 'Failed')
-        ],
-        default='pending'
+        choices=[(status.value, status.name) for status in TranslationStatus],
+        default=TranslationStatus.PENDING.value
     )
     translated_file = models.FileField(upload_to='translations/', null=True, blank=True)
     error_message = models.TextField(blank=True)
@@ -32,13 +28,8 @@ class TranslationChunk(models.Model):
     translated_text = models.TextField(null=True, blank=True, help_text="The translated text of this chunk")
     status = models.CharField(
         max_length=20,
-        choices=[
-            ('pending', 'Pending'),
-            ('processing', 'Processing'),
-            ('completed', 'Completed'),
-            ('failed', 'Failed')
-        ],
-        default='pending'
+        choices=[(status.value, status.name) for status in TranslationStatus],
+        default=TranslationStatus.PENDING.value
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

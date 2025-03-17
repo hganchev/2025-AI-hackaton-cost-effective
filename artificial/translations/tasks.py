@@ -10,6 +10,7 @@ from books.models import Book
 from .models import Translation, TranslationChunk
 from core.ml_translator import translate_text, split_text_into_chunks
 from core.extractor import BookExtractor
+from .schemas import TranslationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ def prepare_translation(translation_id, max_length=400, chunk_size=2000):
         book = translation.book
         
         # Update translation status
-        translation.status = 'processing'
+        translation.status = TranslationStatus.PROCESSING.value
         translation.save()
         
         # Extract content from book
@@ -42,7 +43,7 @@ def prepare_translation(translation_id, max_length=400, chunk_size=2000):
                     translation=translation,
                     chunk_index=i,
                     original_text=chunk_text,
-                    status='pending'
+                    status=TranslationStatus.PENDING.value
                 )
                 chunk_ids.append(chunk.id)
         
@@ -71,7 +72,7 @@ def prepare_translation(translation_id, max_length=400, chunk_size=2000):
         # Update translation with error
         try:
             translation = Translation.objects.get(id=translation_id)
-            translation.status = 'failed'
+            translation.status = TranslationStatus.FAILED.value
             translation.error_message = str(e)
             translation.save()
         except:
@@ -94,8 +95,10 @@ def translate_chunk(chunk_id, max_length=400):
         translation = chunk.translation
         book = translation.book
         
+        logger.info(f"Starting translation of chunk {chunk_id} for translation {translation.id}")
+        
         # Update chunk status
-        chunk.status = 'processing'
+        chunk.status = TranslationStatus.PROCESSING.value
         chunk.save()
         
         # Translate the chunk
@@ -108,8 +111,18 @@ def translate_chunk(chunk_id, max_length=400):
         
         # Update the chunk with translation
         chunk.translated_text = translated_text
-        chunk.status = 'completed'
+        chunk.status = TranslationStatus.COMPLETED.value
         chunk.save()
+        
+        logger.info(f"Completed translation of chunk {chunk_id}, updating translation status")
+        
+        # Directly update completed chunks count to avoid race conditions
+        Translation.objects.filter(id=translation.id).update(
+            completed_chunks=TranslationChunk.objects.filter(
+                translation_id=translation.id,
+                status=TranslationStatus.COMPLETED.value
+            ).count()
+        )
         
         # Check if all chunks are completed to update the translation status
         check_translation_completion.delay(translation.id)
@@ -127,14 +140,14 @@ def translate_chunk(chunk_id, max_length=400):
         # Update chunk with error
         try:
             chunk = TranslationChunk.objects.get(id=chunk_id)
-            chunk.status = 'failed'
+            chunk.status = TranslationStatus.FAILED.value
             chunk.error_message = str(e)
             chunk.save()
             
             # Also check if this failure affects the overall translation
             check_translation_completion.delay(chunk.translation_id)
-        except:
-            pass
+        except Exception as inner_e:
+            logger.error(f"Error updating failed chunk {chunk_id}: {str(inner_e)}")
             
         return {
             "success": False,
@@ -148,34 +161,41 @@ def check_translation_completion(translation_id):
     Check if all chunks for a translation are complete and update the translation status
     """
     try:
+        logger.info(f"Checking completion status for translation {translation_id}")
         translation = Translation.objects.get(id=translation_id)
         
         # Count chunks by status
         chunk_counts = TranslationChunk.objects.filter(translation=translation).aggregate(
             total=Count('id'),
-            completed=Count('id', filter=Q(status='completed')),
-            failed=Count('id', filter=Q(status='failed'))
+            completed=Count('id', filter=Q(status=TranslationStatus.COMPLETED.value)),
+            failed=Count('id', filter=Q(status=TranslationStatus.FAILED.value))
         )
         
         total = chunk_counts.get('total', 0)
         completed = chunk_counts.get('completed', 0)
         failed = chunk_counts.get('failed', 0)
         
-        # Update completed chunks count
-        translation.completed_chunks = completed
+        logger.info(f"Translation {translation_id} status: total={total}, completed={completed}, failed={failed}")
+        
+        # Update translation using update() to avoid race conditions
+        translation_update = {
+            'completed_chunks': completed
+        }
         
         # Update translation status based on chunk counts
         if failed > 0:
-            translation.status = 'failed'
-            translation.error_message = f"{failed} chunk(s) failed to translate"
+            translation_update['status'] = TranslationStatus.FAILED.value
+            translation_update['error_message'] = f"{failed} chunk(s) failed to translate"
         elif completed == total:
-            translation.status = 'completed'
-            # Generate a complete text file with all translated chunks
-            create_complete_translation_file.delay(translation_id)
+            translation_update['status'] = TranslationStatus.COMPLETED.value
         else:
-            translation.status = 'processing'
+            translation_update['status'] = TranslationStatus.PROCESSING.value
         
-        translation.save()
+        Translation.objects.filter(id=translation_id).update(**translation_update)
+        
+        # If translation is completed, trigger the file creation
+        if completed == total and failed == 0:
+            create_complete_translation_file.delay(translation_id)
         
         return {
             "success": True,
@@ -204,7 +224,7 @@ def create_complete_translation_file(translation_id):
         # Get all completed chunks, ordered by index
         chunks = TranslationChunk.objects.filter(
             translation=translation, 
-            status='completed'
+            status=TranslationStatus.COMPLETED.value
         ).order_by('chunk_index')
         
         # Create output file
