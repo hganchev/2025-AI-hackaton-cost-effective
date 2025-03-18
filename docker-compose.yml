@@ -79,7 +79,7 @@ services:
     volumes:
       - ./artificial:/app
       - ml_models_data:/app/ml_models
-      - ./media:/app/media
+      - media_data:/app/media
     environment:
       - DEBUG=1
       - CELERY_BROKER_URL=redis://redis:6379/0
