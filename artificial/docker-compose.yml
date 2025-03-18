@@ -1,0 +1,102 @@
+services:
+  web:
+    build: .
+    command: >
+      bash -c "python manage.py wait_for_db &&
+               python manage.py migrate &&
+               python manage.py auto_createsuperuser --username admin --email admin@example.com --password admin &&
+               python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+      # Create persistent volumes for media and model cache
+      - ml_models_data:/app/ml_models
+      - ./media:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - POSTGRES_DB=book_translator
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+
+  celery:
+    build: .
+    command: ["celery", "-A", "book_translator", "worker", "-l", "info", "-E"]
+    volumes:
+      - .:/app
+      - ml_models_data:/app/ml_models
+      - ./media:/app/media
+    environment:
+      - DEBUG=1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - POSTGRES_DB=book_translator
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    depends_on:
+      - redis
+      - db
+    deploy:
+      resources:
+        limits:
+          cpus: '5.0'  # Limit of CPU
+        reservations:
+          cpus: '1.0'  # Guarantee at least CPU
+    restart: unless-stopped
+
+  flower:
+    image: mher/flower:latest
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      celery -A book_translator flower
+      --broker=redis://redis:6379/0
+      --port=5555
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    
+  db:
+    image: postgres:latest
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=book_translator
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB'
+
+volumes:
+  ml_models_data:
+    # This volume persists the downloaded ML models between container restarts
+  redis_data:
+    # This volume persists Redis data between container restarts
+  postgres_data:
+    # This volume persists PostgreSQL data between container restarts
