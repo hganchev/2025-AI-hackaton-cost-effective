@@ -303,18 +303,20 @@ def get_full_translation(request: HttpRequest, book_id: int, language_code: str)
         api_logger.error(f"Book with ID {book_id} not found")
         return 404, ErrorResponse(detail=f"Book with ID {book_id} not found")
     
-    # Get translations for this book in the specified language
-    translations = Translation.objects.filter(
-        book=book,
-        target_language=language_code
-    )
+    # Check if the book matches the requested language
+    if book.target_language != language_code:
+        api_logger.error(f"Book {book_id} is not available in language {language_code} (it's in {book.target_language})")
+        return 404, ErrorResponse(detail=f"Book {book_id} is not available in language {language_code} (it's in {book.target_language})")
+    
+    # Get translations for this book
+    translations = Translation.objects.filter(book=book)
     
     if not translations.exists():
-        api_logger.error(f"No translations found for book {book_id} in language {language_code}")
-        return 404, ErrorResponse(detail=f"No translations found for book {book_id} in language {language_code}")
+        api_logger.error(f"No translations found for book {book_id}")
+        return 404, ErrorResponse(detail=f"No translations found for book {book_id}")
     
-    # Handle search if provided
-    search_query = request.query_params.get('search')
+    # Handle search if provided - using request.GET instead of request.query_params
+    search_query = request.GET.get('search')
     chunks = TranslationChunk.objects.filter(
         translation__in=translations,
         status='completed'
