@@ -70,6 +70,8 @@ services:
       - redis
       - db
      restart: unless-stopped
+     networks:
+      - app-network
 
 celery:
     build: /artificial
@@ -97,6 +99,8 @@ celery:
         reservations:
           cpus: '1.0'  # Guarantee at least CPU
     restart: unless-stopped
+    networks:
+      - app-network
 
 flower:
     image: mher/flower:latest
@@ -114,6 +118,8 @@ flower:
       - "5555:5555"
     depends_on:
       - redis
+    networks:
+      - app-network
 
 db:
     image: postgres:latest
@@ -127,6 +133,8 @@ db:
       - "5432:5432"
     restart: unless-stopped
     command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB'
+    networks:
+      - app-network
 
 volumes:
   redis_data:
