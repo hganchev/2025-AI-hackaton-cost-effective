@@ -7,6 +7,7 @@ __pycache__/
 
 media/
 ml_models/
+logs/
 
 .venv/
 staticfiles/

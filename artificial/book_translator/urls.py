@@ -1,33 +1,33 @@
 """
 URL configuration for book_translator project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import RedirectView
+from ninja import NinjaAPI
 
-from translator.api import api
-from translator import views
+from books.api import books_api
+from translations.api import translations_api
+
+# Create a combined API router
+api = NinjaAPI(
+    title="Book Translation Service",
+    version="1.0.0",
+    description="Complete API for translating books with ML-based chunk processing",
+)
+
+# Add the sub-routers
+api.add_router("/books", books_api)
+api.add_router("/translations", translations_api)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', api.urls),  # Django Ninja API
-    path('about/', views.about, name='about'),
-    path('', RedirectView.as_view(url='/api/docs'), name='home'),  # Redirect root to API docs
+    # API endpoints
+    path('api/', api.urls),
+    # Redirect root to API docs
+    path('', RedirectView.as_view(url='/api/docs', permanent=False), name='home'),
 ]
 
 # Serve media files during development
