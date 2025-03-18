@@ -332,7 +332,10 @@ def get_full_translation(request: HttpRequest, book_id: int, language_code: str)
             rank=SearchRank(vector, query)
         ).filter(search=query).order_by('-rank')
     
-    # Organize the response
+    # Merge all chunks into a single text
+    merged_content = "\n\n".join(chunk.translated_text for chunk in chunks if chunk.translated_text)
+    
+    # Organize the response with merged content
     result = {
         'book': {
             'id': book.id,
@@ -341,14 +344,7 @@ def get_full_translation(request: HttpRequest, book_id: int, language_code: str)
             'source_language': book.source_language
         },
         'target_language': language_code,
-        'chunks': []
+        'content': merged_content
     }
-    
-    # Add each translated chunk
-    for chunk in chunks:
-        result['chunks'].append({
-            'chunk_index': chunk.chunk_index,
-            'content': chunk.translated_text
-        })
     
     return 200, result

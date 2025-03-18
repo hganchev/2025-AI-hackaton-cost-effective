@@ -15,7 +15,7 @@ from .schemas import TranslationStatus
 logger = logging.getLogger(__name__)
 
 @shared_task
-def prepare_translation(translation_id, max_length=400, chunk_size=2000):
+def prepare_translation(translation_id, max_length=400, chunk_size=1):
     """
     Prepare a translation by extracting the book content and creating chunk tasks
     """

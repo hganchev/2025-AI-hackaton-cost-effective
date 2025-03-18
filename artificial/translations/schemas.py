@@ -15,7 +15,7 @@ class TranslationBase(BaseModel):
 
 class TranslationCreate(TranslationBase):
     max_length: Optional[int] = 400  # Maximum length of tokens for translation
-    chunk_size: Optional[int] = 2000  # Characters per chunk
+    chunk_size: Optional[int] = 1    # Sentence per chunk
 
 class TranslationChunkOut(BaseModel):
     id: int

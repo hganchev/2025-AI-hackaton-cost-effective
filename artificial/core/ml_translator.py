@@ -56,7 +56,7 @@ def translate_text(text: str, source_lang: str, target_lang: str, max_length: in
 # Get a logger for this module
 ml_logger = logging.getLogger(__name__)
 
-def split_text_into_chunks(text: str, chunk_size: int = 2000) -> List[str]:
+def split_text_into_chunks(text: str, chunk_size: int = 1) -> List[str]:
     """Split text into chunks of approximately equal size while preserving sentence integrity"""
     # Preprocess and normalize text
     # Replace multiple whitespaces with a single space
