@@ -44,13 +44,13 @@ services:
 
   # Artificial service (ML application)
   artificial:
-     build: /artificial
+     build: ./artificial
      command: >
       bash -c "python manage.py wait_for_db &&
                python manage.py migrate &&
                python manage.py runserver 0.0.0.0:8000"
      volumes:
-      - .:/app
+      - ./artificial:/app
       # Create persistent volumes for media and model cache
       - ml_models_data:/app/ml_models
       - media_data:/app/media
@@ -74,10 +74,10 @@ services:
       - app-network
 
   celery:
-    build: /artificial
+    build: ./artificial
     command: ["celery", "-A", "book_translator", "worker", "-l", "info", "-E"]
     volumes:
-      - .:/app
+      - ./artificial:/app
       - ml_models_data:/app/ml_models
       - ./media:/app/media
     environment:
@@ -105,7 +105,7 @@ services:
   flower:
     image: mher/flower:latest
     build: 
-      context: /artificial
+      context: ./artificial
       dockerfile: Dockerfile
     command: >
       celery -A book_translator flower
