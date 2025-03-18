@@ -33,6 +33,20 @@ def create_translation(request: HttpRequest, data: TranslationCreate):
         except Book.DoesNotExist:
             return 404, ErrorResponse(detail=f"Book with ID {data.book_id} not found")
         
+        # Check if a translation for this book in the same target language already exists
+        existing_translation = Translation.objects.filter(
+            book=book,
+            book__target_language=book.target_language
+        ).exclude(
+            status=TranslationStatus.FAILED.value
+        ).first()
+        
+        if existing_translation:
+            status_message = TranslationStatus(existing_translation.status).name.lower()
+            return 400, ErrorResponse(
+                detail=f"A translation for this book to {book.target_language} already exists (status: {status_message})"
+            )
+        
         # Create a new translation with pending status
         translation = Translation.objects.create(
             book=book,
