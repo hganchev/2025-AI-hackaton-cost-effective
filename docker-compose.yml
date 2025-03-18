@@ -73,7 +73,7 @@ services:
      networks:
       - app-network
 
-celery:
+  celery:
     build: /artificial
     command: ["celery", "-A", "book_translator", "worker", "-l", "info", "-E"]
     volumes:
@@ -102,7 +102,7 @@ celery:
     networks:
       - app-network
 
-flower:
+  flower:
     image: mher/flower:latest
     build: 
       context: /artificial
@@ -121,7 +121,7 @@ flower:
     networks:
       - app-network
 
-db:
+  db:
     image: postgres:latest
     volumes:
       - postgres_data:/var/lib/postgresql/data
